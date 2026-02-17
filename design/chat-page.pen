@@ -1,0 +1,366 @@
+{
+  "version": "1.0",
+  "name": "Chat Page - Vibe Remote",
+  "canvas": {
+    "width": 390,
+    "height": 844,
+    "background": "#000000"
+  },
+  "designTokens": {
+    "colors": {
+      "bg-primary": "#000000",
+      "bg-secondary": "#0a0a0a",
+      "bg-tertiary": "#121212",
+      "bg-elevated": "#1a1a1a",
+      "bg-surface": "#1e1e1e",
+      "text-primary": "#e4e4e7",
+      "text-secondary": "#a1a1aa",
+      "text-muted": "#52525b",
+      "accent": "#3b82f6",
+      "accent-hover": "#60a5fa",
+      "accent-muted": "#1e3a5f",
+      "success": "#22c55e",
+      "danger": "#ef4444",
+      "warning": "#f59e0b",
+      "border": "#27272a"
+    },
+    "radius": {
+      "sm": 8,
+      "md": 12,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    },
+    "typography": {
+      "fontFamily": "Inter, -apple-system, sans-serif",
+      "fontMono": "JetBrains Mono, monospace"
+    }
+  },
+  "frames": [
+    {
+      "id": "chat-page",
+      "name": "ChatPage",
+      "type": "frame",
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "fill": "#000000",
+      "children": ["header", "message-list", "input-area", "bottom-nav"]
+    },
+    {
+      "id": "header",
+      "name": "Header",
+      "type": "frame",
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 100,
+      "fill": "rgba(0,0,0,0.8)",
+      "backdropBlur": 20,
+      "borderBottom": "1px solid #27272a",
+      "children": ["menu-btn", "workspace-info", "action-btns"]
+    },
+    {
+      "id": "workspace-info",
+      "name": "WorkspaceInfo",
+      "type": "group",
+      "x": 50,
+      "y": 44,
+      "children": [
+        {
+          "type": "text",
+          "text": "merak-platform",
+          "fontSize": 17,
+          "fontWeight": 600,
+          "fill": "#e4e4e7"
+        },
+        {
+          "type": "text",
+          "text": "main • 2 uncommitted",
+          "fontSize": 13,
+          "fill": "#a1a1aa",
+          "y": 22
+        }
+      ]
+    },
+    {
+      "id": "message-list",
+      "name": "MessageList",
+      "type": "frame",
+      "x": 0,
+      "y": 100,
+      "width": 390,
+      "height": 580,
+      "fill": "#000000",
+      "overflow": "scroll",
+      "children": ["ai-message-1", "user-message-1"]
+    },
+    {
+      "id": "ai-message-1",
+      "name": "AIMessage",
+      "type": "frame",
+      "x": 16,
+      "y": 16,
+      "width": 320,
+      "maxWidth": "85%",
+      "fill": "#0a0a0a",
+      "stroke": "#27272a",
+      "strokeWidth": 1,
+      "cornerRadius": [4, 16, 16, 16],
+      "padding": [12, 16],
+      "shadow": "0 1px 2px rgba(0,0,0,0.3)",
+      "children": [
+        {
+          "type": "text",
+          "text": "I'll add rate limiting using express-rate-limit. This will protect your API from abuse.",
+          "fontSize": 15,
+          "lineHeight": 1.5,
+          "fill": "#e4e4e7",
+          "width": 288
+        },
+        {
+          "type": "frame",
+          "name": "CodeBlock",
+          "y": 60,
+          "width": 288,
+          "fill": "#000000",
+          "stroke": "#27272a",
+          "cornerRadius": 12,
+          "padding": 12,
+          "children": [
+            {
+              "type": "text",
+              "text": "import rateLimit from 'express-rate-limit';",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 13,
+              "fill": "#e4e4e7"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "name": "ReviewLink",
+          "y": 130,
+          "children": [
+            {
+              "type": "text",
+              "text": "📄 Modified 3 files",
+              "fontSize": 13,
+              "fill": "#a1a1aa"
+            },
+            {
+              "type": "text",
+              "text": "Review Changes →",
+              "fontSize": 13,
+              "fill": "#3b82f6",
+              "y": 18
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "user-message-1",
+      "name": "UserMessage",
+      "type": "frame",
+      "x": 54,
+      "y": 200,
+      "width": 320,
+      "maxWidth": "85%",
+      "fill": "#1e3a5f",
+      "cornerRadius": [16, 16, 4, 16],
+      "padding": [12, 16],
+      "alignSelf": "flex-end",
+      "children": [
+        {
+          "type": "text",
+          "text": "Add rate limiting to the API gateway",
+          "fontSize": 15,
+          "lineHeight": 1.5,
+          "fill": "#e4e4e7"
+        }
+      ]
+    },
+    {
+      "id": "input-area",
+      "name": "InputArea",
+      "type": "frame",
+      "x": 0,
+      "y": 680,
+      "width": 390,
+      "height": 100,
+      "fill": "#000000",
+      "borderTop": "1px solid #27272a",
+      "padding": 16,
+      "children": ["attach-btn", "text-input", "voice-btn", "template-bar"]
+    },
+    {
+      "id": "attach-btn",
+      "name": "AttachButton",
+      "type": "ellipse",
+      "x": 0,
+      "y": 2,
+      "width": 44,
+      "height": 44,
+      "fill": "#121212",
+      "children": [
+        {
+          "type": "text",
+          "text": "📎",
+          "fontSize": 20,
+          "textAlign": "center"
+        }
+      ]
+    },
+    {
+      "id": "text-input",
+      "name": "TextInput",
+      "type": "frame",
+      "x": 52,
+      "y": 0,
+      "width": 238,
+      "height": 48,
+      "fill": "#1e1e1e",
+      "stroke": "#27272a",
+      "cornerRadius": 12,
+      "padding": [12, 16],
+      "children": [
+        {
+          "type": "text",
+          "text": "Ask anything...",
+          "fontSize": 15,
+          "fill": "#52525b"
+        }
+      ]
+    },
+    {
+      "id": "voice-btn",
+      "name": "VoiceButton",
+      "type": "ellipse",
+      "x": 298,
+      "y": 2,
+      "width": 44,
+      "height": 44,
+      "fill": "#3b82f6",
+      "children": [
+        {
+          "type": "text",
+          "text": "🎤",
+          "fontSize": 20,
+          "textAlign": "center"
+        }
+      ]
+    },
+    {
+      "id": "template-bar",
+      "name": "TemplateBar",
+      "type": "frame",
+      "x": 0,
+      "y": 56,
+      "width": 390,
+      "height": 32,
+      "overflow": "scroll-x",
+      "gap": 8,
+      "children": [
+        {
+          "type": "frame",
+          "name": "TemplatePill",
+          "fill": "#121212",
+          "cornerRadius": 16,
+          "padding": [6, 12],
+          "children": [
+            {"type": "text", "text": "Fix lint", "fontSize": 13, "fill": "#e4e4e7"}
+          ]
+        },
+        {
+          "type": "frame",
+          "name": "TemplatePill",
+          "fill": "#121212",
+          "cornerRadius": 16,
+          "padding": [6, 12],
+          "x": 80,
+          "children": [
+            {"type": "text", "text": "Write tests", "fontSize": 13, "fill": "#e4e4e7"}
+          ]
+        },
+        {
+          "type": "frame",
+          "name": "TemplatePill",
+          "fill": "#121212",
+          "cornerRadius": 16,
+          "padding": [6, 12],
+          "x": 175,
+          "children": [
+            {"type": "text", "text": "Refactor", "fontSize": 13, "fill": "#e4e4e7"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bottom-nav",
+      "name": "BottomNav",
+      "type": "frame",
+      "x": 0,
+      "y": 780,
+      "width": 390,
+      "height": 64,
+      "fill": "#0a0a0a",
+      "borderTop": "1px solid #27272a",
+      "paddingBottom": "env(safe-area-inset-bottom)",
+      "flexDirection": "row",
+      "justifyContent": "space-around",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "group",
+          "name": "NavItem-Chat",
+          "children": [
+            {"type": "text", "text": "💬", "fontSize": 24, "fill": "#3b82f6", "textAlign": "center"},
+            {"type": "text", "text": "Chat", "fontSize": 11, "fill": "#3b82f6", "y": 28, "textAlign": "center"}
+          ]
+        },
+        {
+          "type": "group",
+          "name": "NavItem-Diff",
+          "x": 97,
+          "children": [
+            {"type": "text", "text": "📝", "fontSize": 24, "fill": "#a1a1aa", "textAlign": "center"},
+            {"type": "text", "text": "Diff", "fontSize": 11, "fill": "#a1a1aa", "y": 28, "textAlign": "center"},
+            {
+              "type": "frame",
+              "name": "Badge",
+              "x": 20,
+              "y": -4,
+              "width": 18,
+              "height": 18,
+              "fill": "#ef4444",
+              "cornerRadius": 9,
+              "children": [
+                {"type": "text", "text": "2", "fontSize": 11, "fill": "#ffffff", "textAlign": "center", "fontWeight": 500}
+              ]
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "name": "NavItem-Tasks",
+          "x": 194,
+          "children": [
+            {"type": "text", "text": "📋", "fontSize": 24, "fill": "#a1a1aa", "textAlign": "center"},
+            {"type": "text", "text": "Tasks", "fontSize": 11, "fill": "#a1a1aa", "y": 28, "textAlign": "center"}
+          ]
+        },
+        {
+          "type": "group",
+          "name": "NavItem-Repos",
+          "x": 291,
+          "children": [
+            {"type": "text", "text": "📁", "fontSize": 24, "fill": "#a1a1aa", "textAlign": "center"},
+            {"type": "text", "text": "Repos", "fontSize": 11, "fill": "#a1a1aa", "y": 28, "textAlign": "center"}
+          ]
+        }
+      ]
+    }
+  ]
+}

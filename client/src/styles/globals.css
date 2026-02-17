@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Color tokens */
+    --bg-primary: #000000;
+    --bg-secondary: #0a0a0a;
+    --bg-tertiary: #121212;
+    --bg-elevated: #1a1a1a;
+    --bg-surface: #1e1e1e;
+
+    --text-primary: #e4e4e7;
+    --text-secondary: #a1a1aa;
+    --text-muted: #52525b;
+
+    --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+    --accent-muted: #1e3a5f;
+
+    --success: #22c55e;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+
+    --border: #27272a;
+    --border-focus: #3b82f6;
+
+    /* Radius tokens */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-2xl: 24px;
+
+    /* Safe areas for mobile */
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-left: env(safe-area-inset-left, 0px);
+    --safe-area-right: env(safe-area-inset-right, 0px);
+  }
+
+  html {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior: none;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+  }
+
+  /* Safe area padding utilities */
+  .safe-top {
+    padding-top: var(--safe-area-top);
+  }
+  .safe-bottom {
+    padding-bottom: var(--safe-area-bottom);
+  }
+}
+
+@layer components {
+  /* Message bubbles */
+  .message-ai {
+    @apply bg-bg-secondary border border-border rounded-[4px_16px_16px_16px]
+           px-4 py-3 max-w-[85%] shadow-sm;
+  }
+
+  .message-user {
+    @apply bg-accent-muted rounded-[16px_16px_4px_16px]
+           px-4 py-3 max-w-[85%];
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-bg-secondary border border-border rounded-lg p-4 shadow-md
+           transition-colors duration-200;
+  }
+  .card:hover {
+    @apply bg-bg-tertiary border-border-focus;
+  }
+  .card.active {
+    @apply border-accent shadow-glow;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply rounded-md px-5 py-3 font-medium transition-all duration-200
+           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn bg-accent text-white shadow-sm hover:bg-accent-hover;
+  }
+
+  .btn-secondary {
+    @apply btn bg-bg-tertiary text-text-primary border border-border
+           hover:bg-bg-elevated;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-text-secondary hover:bg-bg-tertiary;
+  }
+
+  .btn-danger {
+    @apply btn bg-danger text-white;
+  }
+
+  .btn-icon {
+    @apply w-11 h-11 rounded-full bg-bg-tertiary flex items-center justify-center
+           transition-colors duration-200 hover:bg-bg-elevated;
+  }
+
+  /* Inputs */
+  .input {
+    @apply bg-bg-surface border border-border rounded-md px-4 py-3
+           text-text-primary placeholder:text-text-muted
+           focus:border-border-focus focus:shadow-glow focus:outline-none
+           min-h-[48px] transition-all duration-200;
+  }
+
+  /* Bottom navigation */
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 bg-bg-secondary border-t border-border
+           flex justify-around items-center safe-bottom;
+    height: calc(64px + var(--safe-area-bottom));
+  }
+
+  .nav-item {
+    @apply flex flex-col items-center gap-1 py-2 px-4;
+  }
+  .nav-item-icon {
+    @apply text-2xl text-text-secondary;
+  }
+  .nav-item-label {
+    @apply text-xs text-text-secondary;
+  }
+  .nav-item.active .nav-item-icon,
+  .nav-item.active .nav-item-label {
+    @apply text-accent;
+  }
+
+  /* Badge */
+  .badge {
+    @apply bg-danger text-white text-xs font-medium px-1.5 py-0.5
+           rounded-sm min-w-[18px] text-center;
+  }
+
+  /* Bottom sheet */
+  .bottom-sheet {
+    @apply fixed inset-x-0 bottom-0 bg-bg-elevated rounded-t-2xl p-6 shadow-xl safe-bottom;
+  }
+  .bottom-sheet-handle {
+    @apply w-12 h-1 bg-border rounded-full mx-auto mb-4;
+  }
+
+  /* Header */
+  .header {
+    @apply fixed top-0 left-0 right-0 h-14 bg-black/80 backdrop-blur-xl
+           border-b border-border px-4 flex items-center safe-top z-50;
+  }
+}

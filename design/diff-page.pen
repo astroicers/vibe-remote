@@ -1,0 +1,307 @@
+{
+  "version": "1.0",
+  "name": "Diff Review Page - Vibe Remote",
+  "canvas": {
+    "width": 390,
+    "height": 844,
+    "background": "#000000"
+  },
+  "designTokens": {
+    "colors": {
+      "bg-primary": "#000000",
+      "bg-secondary": "#0a0a0a",
+      "diff-add-bg": "#052e16",
+      "diff-add-text": "#4ade80",
+      "diff-del-bg": "#2a0a0a",
+      "diff-del-text": "#f87171",
+      "success": "#22c55e",
+      "danger": "#ef4444",
+      "accent": "#3b82f6",
+      "text-primary": "#e4e4e7",
+      "text-secondary": "#a1a1aa",
+      "border": "#27272a"
+    }
+  },
+  "frames": [
+    {
+      "id": "diff-page",
+      "name": "DiffPage",
+      "type": "frame",
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "fill": "#000000"
+    },
+    {
+      "id": "header",
+      "name": "DiffHeader",
+      "type": "frame",
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 100,
+      "fill": "#000000",
+      "borderBottom": "1px solid #27272a",
+      "children": [
+        {
+          "type": "text",
+          "text": "← Diff Review",
+          "x": 16,
+          "y": 54,
+          "fontSize": 17,
+          "fontWeight": 600,
+          "fill": "#e4e4e7"
+        },
+        {
+          "type": "text",
+          "text": "3 files changed  +45 -12",
+          "x": 16,
+          "y": 76,
+          "fontSize": 13,
+          "fill": "#a1a1aa"
+        }
+      ]
+    },
+    {
+      "id": "file-indicator",
+      "name": "FileIndicator",
+      "type": "frame",
+      "x": 0,
+      "y": 100,
+      "width": 390,
+      "height": 60,
+      "fill": "#0a0a0a",
+      "padding": 16,
+      "children": [
+        {
+          "type": "frame",
+          "name": "Dots",
+          "flexDirection": "row",
+          "gap": 8,
+          "children": [
+            {"type": "ellipse", "width": 8, "height": 8, "fill": "#3b82f6"},
+            {"type": "ellipse", "width": 8, "height": 8, "fill": "#52525b", "x": 16},
+            {"type": "ellipse", "width": 8, "height": 8, "fill": "#52525b", "x": 32}
+          ]
+        },
+        {
+          "type": "text",
+          "text": "rate-limiter.ts",
+          "x": 60,
+          "y": 0,
+          "fontSize": 15,
+          "fontWeight": 500,
+          "fill": "#e4e4e7"
+        },
+        {
+          "type": "text",
+          "text": "(new file, +35)",
+          "x": 60,
+          "y": 20,
+          "fontSize": 13,
+          "fill": "#4ade80"
+        }
+      ]
+    },
+    {
+      "id": "diff-viewer",
+      "name": "DiffViewer",
+      "type": "frame",
+      "x": 0,
+      "y": 160,
+      "width": 390,
+      "height": 480,
+      "fill": "#000000",
+      "overflow": "scroll",
+      "padding": 16,
+      "children": [
+        {
+          "type": "frame",
+          "name": "DiffLine-Add-1",
+          "width": 358,
+          "height": 24,
+          "fill": "#052e16",
+          "padding": [4, 8],
+          "children": [
+            {"type": "text", "text": "1", "fontSize": 13, "fill": "#52525b", "fontFamily": "JetBrains Mono", "width": 24},
+            {"type": "text", "text": "+ import rateLimit from", "x": 32, "fontSize": 13, "fill": "#4ade80", "fontFamily": "JetBrains Mono"}
+          ]
+        },
+        {
+          "type": "frame",
+          "name": "DiffLine-Add-2",
+          "y": 24,
+          "width": 358,
+          "height": 24,
+          "fill": "#052e16",
+          "padding": [4, 8],
+          "children": [
+            {"type": "text", "text": "2", "fontSize": 13, "fill": "#52525b", "fontFamily": "JetBrains Mono", "width": 24},
+            {"type": "text", "text": "+   'express-rate-limit';", "x": 32, "fontSize": 13, "fill": "#4ade80", "fontFamily": "JetBrains Mono"}
+          ]
+        },
+        {
+          "type": "frame",
+          "name": "DiffLine-Context",
+          "y": 48,
+          "width": 358,
+          "height": 24,
+          "fill": "#000000",
+          "padding": [4, 8],
+          "children": [
+            {"type": "text", "text": "3", "fontSize": 13, "fill": "#52525b", "fontFamily": "JetBrains Mono", "width": 24},
+            {"type": "text", "text": " ", "x": 32, "fontSize": 13, "fill": "#e4e4e7", "fontFamily": "JetBrains Mono"}
+          ]
+        },
+        {
+          "type": "frame",
+          "name": "DiffLine-Add-3",
+          "y": 72,
+          "width": 358,
+          "height": 24,
+          "fill": "#052e16",
+          "padding": [4, 8],
+          "children": [
+            {"type": "text", "text": "4", "fontSize": 13, "fill": "#52525b", "fontFamily": "JetBrains Mono", "width": 24},
+            {"type": "text", "text": "+ export function createRateLimiter() {", "x": 32, "fontSize": 13, "fill": "#4ade80", "fontFamily": "JetBrains Mono"}
+          ]
+        },
+        {
+          "type": "frame",
+          "name": "DiffLine-Add-4",
+          "y": 96,
+          "width": 358,
+          "height": 24,
+          "fill": "#052e16",
+          "padding": [4, 8],
+          "children": [
+            {"type": "text", "text": "5", "fontSize": 13, "fill": "#52525b", "fontFamily": "JetBrains Mono", "width": 24},
+            {"type": "text", "text": "+   const config = {", "x": 32, "fontSize": 13, "fill": "#4ade80", "fontFamily": "JetBrains Mono"}
+          ]
+        },
+        {
+          "type": "frame",
+          "name": "DiffLine-Add-5",
+          "y": 120,
+          "width": 358,
+          "height": 24,
+          "fill": "#052e16",
+          "padding": [4, 8],
+          "children": [
+            {"type": "text", "text": "6", "fontSize": 13, "fill": "#52525b", "fontFamily": "JetBrains Mono", "width": 24},
+            {"type": "text", "text": "+     windowMs: 15 * 60 * 1000,", "x": 32, "fontSize": 13, "fill": "#4ade80", "fontFamily": "JetBrains Mono"}
+          ]
+        },
+        {
+          "type": "frame",
+          "name": "DiffLine-Add-6",
+          "y": 144,
+          "width": 358,
+          "height": 24,
+          "fill": "#052e16",
+          "padding": [4, 8],
+          "children": [
+            {"type": "text", "text": "7", "fontSize": 13, "fill": "#52525b", "fontFamily": "JetBrains Mono", "width": 24},
+            {"type": "text", "text": "+     max: 100,", "x": 32, "fontSize": 13, "fill": "#4ade80", "fontFamily": "JetBrains Mono"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "review-actions",
+      "name": "ReviewActions",
+      "type": "frame",
+      "x": 0,
+      "y": 640,
+      "width": 390,
+      "height": 140,
+      "fill": "#000000",
+      "borderTop": "1px solid #27272a",
+      "padding": 16,
+      "children": [
+        {
+          "type": "frame",
+          "name": "ActionButtons",
+          "flexDirection": "row",
+          "justifyContent": "space-between",
+          "gap": 12,
+          "children": [
+            {
+              "type": "frame",
+              "name": "RejectButton",
+              "width": 110,
+              "height": 56,
+              "fill": "#450a0a",
+              "cornerRadius": 12,
+              "stroke": "#ef4444",
+              "alignItems": "center",
+              "justifyContent": "center",
+              "children": [
+                {"type": "text", "text": "❌", "fontSize": 24},
+                {"type": "text", "text": "Reject", "y": 28, "fontSize": 13, "fill": "#ef4444", "fontWeight": 500}
+              ]
+            },
+            {
+              "type": "frame",
+              "name": "CommentButton",
+              "x": 122,
+              "width": 110,
+              "height": 56,
+              "fill": "#121212",
+              "cornerRadius": 12,
+              "stroke": "#27272a",
+              "alignItems": "center",
+              "justifyContent": "center",
+              "children": [
+                {"type": "text", "text": "💬", "fontSize": 24},
+                {"type": "text", "text": "Comment", "y": 28, "fontSize": 13, "fill": "#e4e4e7", "fontWeight": 500}
+              ]
+            },
+            {
+              "type": "frame",
+              "name": "ApproveButton",
+              "x": 244,
+              "width": 110,
+              "height": 56,
+              "fill": "#14532d",
+              "cornerRadius": 12,
+              "stroke": "#22c55e",
+              "alignItems": "center",
+              "justifyContent": "center",
+              "children": [
+                {"type": "text", "text": "✅", "fontSize": 24},
+                {"type": "text", "text": "Approve", "y": 28, "fontSize": 13, "fill": "#22c55e", "fontWeight": 500}
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "name": "ApproveAllButton",
+          "y": 72,
+          "width": 358,
+          "height": 48,
+          "fill": "#3b82f6",
+          "cornerRadius": 12,
+          "alignItems": "center",
+          "justifyContent": "center",
+          "children": [
+            {"type": "text", "text": "Approve All 3 Files", "fontSize": 15, "fill": "#ffffff", "fontWeight": 600}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bottom-nav",
+      "name": "BottomNav",
+      "type": "frame",
+      "x": 0,
+      "y": 780,
+      "width": 390,
+      "height": 64,
+      "fill": "#0a0a0a",
+      "borderTop": "1px solid #27272a"
+    }
+  ]
+}
