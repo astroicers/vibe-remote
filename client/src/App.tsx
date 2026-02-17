@@ -3,6 +3,7 @@ import { ChatPage } from './pages/ChatPage';
 import { DiffPage } from './pages/DiffPage';
 import { TasksPage } from './pages/TasksPage';
 import { ReposPage } from './pages/ReposPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
         <Route path="/diff" element={<DiffPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/repos" element={<ReposPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Routes>
     </div>
   );
