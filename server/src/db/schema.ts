@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   title TEXT,
   token_usage TEXT, -- JSON: { input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost_usd }
+  sdk_session_id TEXT, -- Claude Agent SDK session ID for resume
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

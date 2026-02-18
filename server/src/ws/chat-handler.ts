@@ -12,6 +12,13 @@ import {
   updateConversationTitle,
 } from '../routes/chat.js';
 import { toolApprovalStore } from './tool-approval.js';
+import {
+  truncateForHistory,
+  truncateHistory,
+  checkFileSize,
+  formatFileSize,
+  LIMITS,
+} from '../utils/truncate.js';
 
 // Message schemas
 const chatMessageSchema = z.object({
@@ -290,10 +297,10 @@ async function handleChatMessage(
     });
   }
 
-  // Get conversation to find workspace
+  // Get conversation to find workspace and session ID
   const conversation = db
-    .prepare('SELECT workspace_id FROM conversations WHERE id = ?')
-    .get(conversationId) as { workspace_id: string } | undefined;
+    .prepare('SELECT workspace_id, sdk_session_id FROM conversations WHERE id = ?')
+    .get(conversationId) as { workspace_id: string; sdk_session_id: string | null } | undefined;
 
   if (!conversation) {
     send(ws, { type: 'chat_error', error: 'Conversation not found' });
@@ -323,16 +330,51 @@ async function handleChatMessage(
     conversationId,
   });
 
-  // Build prompt with context
-  const contextFiles = data.selectedFiles?.length
-    ? `\n\nSelected files for context: ${data.selectedFiles.join(', ')}`
-    : '';
+  // Build prompt with context (filter out files that are too large)
+  let contextFiles = '';
+  const skippedFiles: string[] = [];
 
+  if (data.selectedFiles?.length) {
+    const validFiles: string[] = [];
+
+    for (const filePath of data.selectedFiles) {
+      const fileCheck = checkFileSize(filePath);
+
+      if (!fileCheck.ok) {
+        skippedFiles.push(`${filePath} (${formatFileSize(fileCheck.size)} > ${formatFileSize(fileCheck.limit)})`);
+      } else {
+        validFiles.push(filePath);
+      }
+    }
+
+    if (validFiles.length > 0) {
+      contextFiles = `\n\nSelected files for context: ${validFiles.join(', ')}`;
+    }
+
+    if (skippedFiles.length > 0) {
+      // Notify client about skipped files
+      send(ws, {
+        type: 'files_skipped',
+        conversationId,
+        files: skippedFiles,
+        reason: 'File size exceeds limit',
+      });
+    }
+  }
+
+  // Only include history if we don't have a session to resume
+  // Session resume keeps context in the SDK, so we don't need to re-send it
+  const hasSessionResume = !!conversation.sdk_session_id;
   const historyContext =
-    history.length > 0
-      ? `\n\nRecent conversation:\n${history
-          .slice(-10)
-          .map((m) => `${m.role}: ${m.content}`)
+    !hasSessionResume && history.length > 0
+      ? `\n\nRecent conversation:\n${truncateHistory(history, LIMITS.historyCount)
+          .map((m) => {
+            // Handle both string content and ContentBlock[] (from tool use)
+            const contentStr = typeof m.content === 'string'
+              ? m.content
+              : '[tool interaction]';
+            return `${m.role}: ${truncateForHistory(contentStr)}`;
+          })
           .join('\n')}`
       : '';
 
@@ -401,6 +443,7 @@ async function handleChatMessage(
       systemPrompt: workspace.systemPrompt || undefined,
       permissionMode: 'bypassPermissions',
       maxTurns: 20,
+      resumeSessionId: conversation.sdk_session_id || undefined,
     });
 
     // Save assistant message
@@ -411,6 +454,13 @@ async function handleChatMessage(
       toolCalls.length > 0 ? toolCalls : undefined,
       toolResults.length > 0 ? toolResults : undefined
     );
+
+    // Save session ID for future resume (if new or changed)
+    if (response.sessionId && response.sessionId !== conversation.sdk_session_id) {
+      db.prepare(
+        `UPDATE conversations SET sdk_session_id = ?, updated_at = datetime('now') WHERE id = ?`
+      ).run(response.sessionId, conversationId);
+    }
 
     // Save token usage to conversation
     if (response.tokenUsage) {

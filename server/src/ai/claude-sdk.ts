@@ -53,12 +53,16 @@ export interface ClaudeSdkOptions {
   permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions';
   maxTurns?: number;
   systemPrompt?: string;
+  /** Session ID to resume an existing conversation */
+  resumeSessionId?: string;
 }
 
 export interface ChatResponse {
   fullText: string;
   modifiedFiles: string[];
   tokenUsage?: TokenUsage;
+  /** Session ID returned by SDK for future resume */
+  sessionId?: string;
 }
 
 export class ClaudeSdkRunner extends EventEmitter {
@@ -71,6 +75,7 @@ export class ClaudeSdkRunner extends EventEmitter {
     let fullText = '';
     const modifiedFiles: string[] = [];
     let tokenUsage: TokenUsage | undefined;
+    let sessionId: string | undefined;
 
     const sdkOptions: Options = {
       model: config.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
@@ -78,8 +83,13 @@ export class ClaudeSdkRunner extends EventEmitter {
       maxTurns: options.maxTurns || 20,
       abortController: this.abortController,
       includePartialMessages: true, // Enable streaming
-      persistSession: false, // Don't persist sessions to disk
+      persistSession: true, // Enable session persistence for resume
     };
+
+    // Handle session resume
+    if (options.resumeSessionId) {
+      sdkOptions.resume = options.resumeSessionId;
+    }
 
     // Handle permission mode
     if (options.permissionMode === 'bypassPermissions') {
@@ -104,6 +114,8 @@ export class ClaudeSdkRunner extends EventEmitter {
           fullText += text;
         }, (usage) => {
           tokenUsage = usage;
+        }, (sid) => {
+          sessionId = sid;
         });
       }
     } catch (error) {
@@ -137,6 +149,7 @@ export class ClaudeSdkRunner extends EventEmitter {
       fullText,
       modifiedFiles: [...new Set(modifiedFiles)], // Deduplicate
       tokenUsage,
+      sessionId,
     };
   }
 
@@ -145,8 +158,13 @@ export class ClaudeSdkRunner extends EventEmitter {
     _fullText: string,
     modifiedFiles: string[],
     appendText: (text: string) => void,
-    setTokenUsage: (usage: TokenUsage) => void
+    setTokenUsage: (usage: TokenUsage) => void,
+    setSessionId: (sessionId: string) => void
   ): void {
+    // Extract session_id from any message that contains it
+    if ('session_id' in message && typeof message.session_id === 'string') {
+      setSessionId(message.session_id);
+    }
     switch (message.type) {
       case 'assistant':
         // Handle complete assistant message

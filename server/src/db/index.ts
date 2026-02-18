@@ -36,6 +36,9 @@ export function initDb(): Database.Database {
   // Run schema
   db.exec(SCHEMA);
 
+  // Run migrations for existing databases
+  runMigrations(db);
+
   // Run seed data (uses INSERT OR IGNORE)
   db.exec(SEED_DATA);
 
@@ -57,4 +60,17 @@ export function generateId(prefix: string): string {
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).substring(2, 8);
   return `${prefix}_${timestamp}${random}`;
+}
+
+// Run migrations for existing databases
+function runMigrations(database: Database.Database): void {
+  // Migration 1: Add sdk_session_id to conversations
+  const hasSessionIdColumn = database
+    .prepare("SELECT COUNT(*) as count FROM pragma_table_info('conversations') WHERE name = 'sdk_session_id'")
+    .get() as { count: number };
+
+  if (hasSessionIdColumn.count === 0) {
+    database.exec('ALTER TABLE conversations ADD COLUMN sdk_session_id TEXT');
+    console.log('✅ Migration: Added sdk_session_id column to conversations');
+  }
 }

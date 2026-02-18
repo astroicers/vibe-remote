@@ -1,10 +1,12 @@
 // Context Builder - Assembles system prompt with project context
+// Optimized for minimal token usage
 
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { getFileTree } from '../workspace/file-tree.js';
 import { getGitStatus, getRecentCommits } from '../workspace/git-ops.js';
 import type { ProjectContext } from './types.js';
+import { truncateText } from '../utils/truncate.js';
 
 const BASE_SYSTEM_PROMPT = `You are a coding assistant working within the Vibe Remote environment. You help engineers write, modify, and debug code through natural language conversation.
 
@@ -30,25 +32,26 @@ const BASE_SYSTEM_PROMPT = `You are a coding assistant working within the Vibe R
 - Keep your explanations brief and mobile-friendly
 - Use code blocks with language tags for any code you show`;
 
-// Key files to include in context
+// Key files to include in context (reduced set for token efficiency)
 const KEY_FILE_PATTERNS = [
   'package.json',
   'tsconfig.json',
   '.env.example',
-  'Dockerfile',
-  'docker-compose.yml',
-  'README.md',
 ];
 
-// Max tokens per file (rough estimate: 1 token ≈ 4 chars)
-const MAX_FILE_CHARS = 20000; // ~5000 tokens
+// Context limits for token efficiency
+const CONTEXT_LIMITS = {
+  maxFileChars: 10000, // ~2500 tokens per file (reduced from 20000)
+  fileTreeDepth: 2, // Reduced from 3
+  recentCommits: 3, // Reduced from 5
+};
 
 export async function buildProjectContext(
   workspacePath: string,
   workspaceSystemPrompt?: string
 ): Promise<ProjectContext> {
-  // Get file tree
-  const tree = getFileTree(workspacePath, { maxDepth: 3 });
+  // Get file tree (limited depth for token efficiency)
+  const tree = getFileTree(workspacePath, { maxDepth: CONTEXT_LIMITS.fileTreeDepth });
   const fileTree = formatFileTree(tree);
 
   // Read key files
@@ -59,14 +62,14 @@ export async function buildProjectContext(
       try {
         let content = readFileSync(filePath, 'utf-8');
 
-        // Truncate if too long
-        if (content.length > MAX_FILE_CHARS) {
-          content = content.slice(0, MAX_FILE_CHARS) + '\n... (truncated)';
-        }
-
         // For package.json, only include relevant sections
         if (pattern === 'package.json') {
           content = summarizePackageJson(content);
+        }
+
+        // Truncate if too long
+        if (content.length > CONTEXT_LIMITS.maxFileChars) {
+          content = truncateText(content, CONTEXT_LIMITS.maxFileChars);
         }
 
         keyFiles[pattern] = content;
@@ -85,7 +88,7 @@ export async function buildProjectContext(
 
   try {
     const status = await getGitStatus(workspacePath);
-    const commits = await getRecentCommits(workspacePath, 5);
+    const commits = await getRecentCommits(workspacePath, CONTEXT_LIMITS.recentCommits);
 
     gitInfo = {
       branch: status.branch,
@@ -150,8 +153,8 @@ export async function buildFullSystemPrompt(
           let content = readFileSync(absolutePath, 'utf-8');
 
           // Truncate large files
-          if (content.length > MAX_FILE_CHARS) {
-            content = content.slice(0, MAX_FILE_CHARS) + '\n... (truncated)';
+          if (content.length > CONTEXT_LIMITS.maxFileChars) {
+            content = truncateText(content, CONTEXT_LIMITS.maxFileChars);
           }
 
           systemPrompt += `\n### ${filePath}\n\`\`\`\n${content}\n\`\`\`\n`;
