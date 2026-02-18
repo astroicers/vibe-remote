@@ -28,7 +28,7 @@ router.get('/conversations', (_req, res) => {
   const conversations = db
     .prepare(
       `
-    SELECT id, title, created_at, updated_at
+    SELECT id, title, token_usage, created_at, updated_at
     FROM conversations
     WHERE workspace_id = ?
     ORDER BY updated_at DESC
@@ -47,7 +47,7 @@ router.get('/conversations/:id', (req, res) => {
   const conversation = db
     .prepare(
       `
-    SELECT id, workspace_id, title, created_at, updated_at
+    SELECT id, workspace_id, title, token_usage, created_at, updated_at
     FROM conversations
     WHERE id = ?
   `
@@ -292,5 +292,161 @@ export function updateConversationTitle(conversationId: string, firstMessage: st
   `
   ).run(title, conversationId);
 }
+
+// Export conversation as Markdown
+router.get('/conversations/:id/export', (req, res) => {
+  const db = getDb();
+
+  interface ConversationRow {
+    id: string;
+    title: string;
+    workspace_id: string;
+    token_usage: string | null;
+    created_at: string;
+  }
+
+  interface MessageRow {
+    role: string;
+    content: string;
+    tool_calls: string | null;
+    tool_results: string | null;
+    created_at: string;
+  }
+
+  const conversation = db
+    .prepare(
+      `
+    SELECT id, title, workspace_id, token_usage, created_at
+    FROM conversations
+    WHERE id = ?
+  `
+    )
+    .get(req.params.id) as ConversationRow | undefined;
+
+  if (!conversation) {
+    res.status(404).json({
+      error: 'Conversation not found',
+      code: 'CONVERSATION_NOT_FOUND',
+    });
+    return;
+  }
+
+  const messages = db
+    .prepare(
+      `
+    SELECT role, content, tool_calls, tool_results, created_at
+    FROM messages
+    WHERE conversation_id = ?
+    ORDER BY created_at ASC
+  `
+    )
+    .all(req.params.id) as MessageRow[];
+
+  // Build Markdown content
+  let markdown = `# ${conversation.title || 'Untitled Conversation'}\n\n`;
+  markdown += `**Created:** ${conversation.created_at}\n\n`;
+
+  // Add token usage if available
+  if (conversation.token_usage) {
+    try {
+      const usage = JSON.parse(conversation.token_usage);
+      markdown += `**Token Usage:**\n`;
+      markdown += `- Input: ${usage.inputTokens?.toLocaleString() || 0}\n`;
+      markdown += `- Output: ${usage.outputTokens?.toLocaleString() || 0}\n`;
+      markdown += `- Cost: $${usage.costUsd?.toFixed(4) || '0.0000'}\n\n`;
+    } catch {
+      // Skip invalid JSON
+    }
+  }
+
+  markdown += `---\n\n`;
+
+  // Add messages
+  for (const msg of messages) {
+    const roleLabel = msg.role === 'user' ? '**User**' : '**Assistant**';
+    const timestamp = msg.created_at;
+
+    markdown += `### ${roleLabel} (${timestamp})\n\n`;
+    markdown += `${msg.content}\n\n`;
+
+    // Add tool calls if any
+    if (msg.tool_calls) {
+      try {
+        const tools = JSON.parse(msg.tool_calls);
+        if (tools.length > 0) {
+          markdown += `<details>\n<summary>Tool Calls (${tools.length})</summary>\n\n`;
+          for (const tool of tools) {
+            markdown += `\`\`\`json\n${JSON.stringify(tool, null, 2)}\n\`\`\`\n\n`;
+          }
+          markdown += `</details>\n\n`;
+        }
+      } catch {
+        // Skip invalid JSON
+      }
+    }
+
+    markdown += `---\n\n`;
+  }
+
+  // Set appropriate headers for download
+  const filename = `conversation-${conversation.id}.md`;
+  res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(markdown);
+});
+
+// Get aggregated token usage stats for workspace
+router.get('/usage', (_req, res) => {
+  const workspace = getActiveWorkspace();
+
+  if (!workspace) {
+    res.status(400).json({
+      error: 'No active workspace',
+      code: 'NO_ACTIVE_WORKSPACE',
+    });
+    return;
+  }
+
+  const db = getDb();
+
+  // Get all conversations with token usage
+  const conversations = db
+    .prepare(
+      `
+    SELECT token_usage
+    FROM conversations
+    WHERE workspace_id = ? AND token_usage IS NOT NULL
+  `
+    )
+    .all(workspace.id) as { token_usage: string }[];
+
+  // Aggregate token usage
+  const totalUsage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    costUsd: 0,
+    conversationCount: conversations.length,
+  };
+
+  for (const conv of conversations) {
+    try {
+      const usage = JSON.parse(conv.token_usage);
+      totalUsage.inputTokens += usage.inputTokens || 0;
+      totalUsage.outputTokens += usage.outputTokens || 0;
+      totalUsage.cacheReadTokens += usage.cacheReadTokens || 0;
+      totalUsage.cacheCreationTokens += usage.cacheCreationTokens || 0;
+      totalUsage.costUsd += usage.costUsd || 0;
+    } catch {
+      // Skip invalid JSON
+    }
+  }
+
+  res.json({
+    workspace: workspace.name,
+    usage: totalUsage,
+  });
+});
 
 export default router;

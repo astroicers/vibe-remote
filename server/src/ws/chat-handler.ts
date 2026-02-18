@@ -5,12 +5,13 @@ import { z } from 'zod';
 import { verifyToken } from '../auth/jwt.js';
 import { getDb, generateId } from '../db/index.js';
 import { getActiveWorkspace, getWorkspace } from '../workspace/index.js';
-import { streamChat } from '../ai/claude.js';
+import { ClaudeCliRunner, StreamEvent } from '../ai/claude-cli.js';
 import {
   getConversationHistory,
   saveMessage,
   updateConversationTitle,
 } from '../routes/chat.js';
+import { toolApprovalStore } from './tool-approval.js';
 
 // Message schemas
 const chatMessageSchema = z.object({
@@ -23,6 +24,19 @@ const chatMessageSchema = z.object({
 const authMessageSchema = z.object({
   type: z.literal('auth'),
   token: z.string(),
+});
+
+const retryMessageSchema = z.object({
+  type: z.literal('chat_retry'),
+  conversationId: z.string(),
+});
+
+const toolApprovalResponseSchema = z.object({
+  type: z.literal('tool_approval_response'),
+  toolId: z.string(),
+  approved: z.boolean(),
+  modifiedInput: z.unknown().optional(),
+  reason: z.string().optional(),
 });
 
 interface AuthenticatedSocket extends WebSocket {
@@ -61,6 +75,7 @@ function send(ws: WebSocket, data: Record<string, unknown>): void {
 
 export function handleChatWebSocket(ws: AuthenticatedSocket): void {
   let isProcessing = false;
+  let currentRunner: ClaudeCliRunner | null = null;
 
   ws.on('message', async (data) => {
     let parsed: unknown;
@@ -131,7 +146,7 @@ export function handleChatWebSocket(ws: AuthenticatedSocket): void {
       isProcessing = true;
 
       try {
-        await handleChatMessage(ws, chatParsed.data);
+        currentRunner = await handleChatMessage(ws, chatParsed.data);
       } catch (error) {
         send(ws, {
           type: 'chat_error',
@@ -139,6 +154,75 @@ export function handleChatWebSocket(ws: AuthenticatedSocket): void {
         });
       } finally {
         isProcessing = false;
+        currentRunner = null;
+      }
+
+      return;
+    }
+
+    // Handle retry message
+    const retryParsed = retryMessageSchema.safeParse(parsed);
+    if (retryParsed.success) {
+      // Check rate limit
+      if (!checkRateLimit(ws.deviceId!)) {
+        send(ws, {
+          type: 'error',
+          error: 'Rate limit exceeded. Please wait before retrying.',
+        });
+        return;
+      }
+
+      // Check if already processing
+      if (isProcessing) {
+        send(ws, {
+          type: 'error',
+          error: 'Already processing a message. Please wait.',
+        });
+        return;
+      }
+
+      isProcessing = true;
+
+      try {
+        currentRunner = await handleRetryMessage(ws, retryParsed.data.conversationId);
+      } catch (error) {
+        send(ws, {
+          type: 'chat_error',
+          error: error instanceof Error ? error.message : 'Retry failed',
+        });
+      } finally {
+        isProcessing = false;
+        currentRunner = null;
+      }
+
+      return;
+    }
+
+    // Handle tool approval response
+    const approvalParsed = toolApprovalResponseSchema.safeParse(parsed);
+    if (approvalParsed.success) {
+      const { toolId, approved, modifiedInput, reason } = approvalParsed.data;
+
+      if (approved) {
+        const success = toolApprovalStore.approve(toolId, modifiedInput);
+        if (success) {
+          send(ws, { type: 'tool_approval_confirmed', toolId, approved: true });
+        } else {
+          send(ws, {
+            type: 'error',
+            error: 'Tool approval not found or already processed',
+          });
+        }
+      } else {
+        const success = toolApprovalStore.reject(toolId, reason);
+        if (success) {
+          send(ws, { type: 'tool_approval_confirmed', toolId, approved: false });
+        } else {
+          send(ws, {
+            type: 'error',
+            error: 'Tool approval not found or already processed',
+          });
+        }
       }
 
       return;
@@ -149,18 +233,32 @@ export function handleChatWebSocket(ws: AuthenticatedSocket): void {
   });
 
   ws.on('close', () => {
-    // Cleanup if needed
+    // Abort any running Claude CLI process
+    if (currentRunner) {
+      currentRunner.abort();
+    }
+
+    // Cancel any pending tool approvals for this device
+    if (ws.deviceId) {
+      const pending = toolApprovalStore.getPendingForDevice(ws.deviceId);
+      for (const approval of pending) {
+        toolApprovalStore.reject(approval.toolId, 'Connection closed');
+      }
+    }
   });
 
   ws.on('error', (error) => {
     console.error('WebSocket error:', error);
+    if (currentRunner) {
+      currentRunner.abort();
+    }
   });
 }
 
 async function handleChatMessage(
   ws: AuthenticatedSocket,
   data: z.infer<typeof chatMessageSchema>
-): Promise<void> {
+): Promise<ClaudeCliRunner> {
   const db = getDb();
 
   // Get or create conversation
@@ -172,7 +270,7 @@ async function handleChatMessage(
     const workspace = getActiveWorkspace();
     if (!workspace) {
       send(ws, { type: 'chat_error', error: 'No active workspace' });
-      return;
+      throw new Error('No active workspace');
     }
 
     // Create new conversation
@@ -199,13 +297,13 @@ async function handleChatMessage(
 
   if (!conversation) {
     send(ws, { type: 'chat_error', error: 'Conversation not found' });
-    return;
+    throw new Error('Conversation not found');
   }
 
   const workspace = getWorkspace(conversation.workspace_id);
   if (!workspace) {
     send(ws, { type: 'chat_error', error: 'Workspace not found' });
-    return;
+    throw new Error('Workspace not found');
   }
 
   // Save user message
@@ -216,7 +314,7 @@ async function handleChatMessage(
     updateConversationTitle(conversationId, data.message);
   }
 
-  // Get conversation history
+  // Get conversation history for context
   const history = getConversationHistory(conversationId);
 
   // Send start event
@@ -225,80 +323,198 @@ async function handleChatMessage(
     conversationId,
   });
 
-  // Accumulate response
+  // Build prompt with context
+  const contextFiles = data.selectedFiles?.length
+    ? `\n\nSelected files for context: ${data.selectedFiles.join(', ')}`
+    : '';
+
+  const historyContext =
+    history.length > 0
+      ? `\n\nRecent conversation:\n${history
+          .slice(-10)
+          .map((m) => `${m.role}: ${m.content}`)
+          .join('\n')}`
+      : '';
+
+  const prompt = `${data.message}${contextFiles}${historyContext}`;
+
+  // Create Claude CLI runner
+  const runner = new ClaudeCliRunner();
+
+  // Accumulate response for saving
   let fullText = '';
   const toolCalls: unknown[] = [];
   const toolResults: unknown[] = [];
 
-  // Stream chat
-  await streamChat(
-    {
-      workspacePath: workspace.path,
-      workspaceSystemPrompt: workspace.systemPrompt || undefined,
-      selectedFiles: data.selectedFiles,
-      conversationHistory: history.slice(-20), // Last 20 messages
-      userMessage: data.message,
-    },
-    {
-      onText: (text) => {
-        fullText += text;
+  // Set up event handlers
+  runner.on('event', (event: StreamEvent) => {
+    switch (event.type) {
+      case 'text':
+        fullText += event.content || '';
         send(ws, {
           type: 'chat_chunk',
           conversationId,
-          text,
+          text: event.content,
         });
-      },
-      onToolUse: (tool) => {
-        toolCalls.push(tool);
+        break;
+
+      case 'tool_use':
+        toolCalls.push({
+          name: event.toolName,
+          input: event.toolInput,
+        });
         send(ws, {
           type: 'tool_use',
           conversationId,
-          tool: tool.name,
-          input: tool.input,
+          tool: event.toolName,
+          input: event.toolInput,
         });
-      },
-      onToolResult: (result) => {
-        toolResults.push(result);
+        break;
+
+      case 'tool_result':
+        toolResults.push(event.toolResult);
         send(ws, {
           type: 'tool_result',
           conversationId,
-          tool: result.name,
-          output: result.output.slice(0, 500), // Truncate for WS
-          isError: result.isError,
+          result: event.toolResult,
         });
-      },
-      onComplete: (response) => {
-        // Save assistant message
-        saveMessage(
-          conversationId!,
-          'assistant',
-          fullText,
-          toolCalls.length > 0 ? toolCalls : undefined,
-          toolResults.length > 0 ? toolResults : undefined
-        );
+        break;
 
-        send(ws, {
-          type: 'chat_complete',
-          conversationId,
-          modifiedFiles: response.modifiedFiles,
-        });
-
-        // If files were modified, send diff ready notification
-        if (response.modifiedFiles.length > 0) {
-          send(ws, {
-            type: 'diff_ready',
-            conversationId,
-            files: response.modifiedFiles,
-          });
-        }
-      },
-      onError: (error) => {
+      case 'error':
         send(ws, {
           type: 'chat_error',
           conversationId,
-          error: error.message,
+          error: event.content,
         });
-      },
+        break;
+
+      case 'done':
+        // Will be handled in the run() promise resolution
+        break;
     }
-  );
+  });
+
+  // Run Claude CLI
+  try {
+    const response = await runner.run(prompt, {
+      workspacePath: workspace.path,
+      systemPrompt: workspace.systemPrompt || undefined,
+      permissionMode: 'bypassPermissions',
+      maxTurns: 20,
+    });
+
+    // Save assistant message
+    saveMessage(
+      conversationId,
+      'assistant',
+      fullText || response.fullText,
+      toolCalls.length > 0 ? toolCalls : undefined,
+      toolResults.length > 0 ? toolResults : undefined
+    );
+
+    // Save token usage to conversation
+    if (response.tokenUsage) {
+      db.prepare(
+        `UPDATE conversations SET token_usage = ?, updated_at = datetime('now') WHERE id = ?`
+      ).run(JSON.stringify(response.tokenUsage), conversationId);
+    }
+
+    // Send completion event
+    send(ws, {
+      type: 'chat_complete',
+      conversationId,
+      modifiedFiles: response.modifiedFiles,
+      tokenUsage: response.tokenUsage,
+    });
+
+    // If files were modified, send diff ready notification
+    if (response.modifiedFiles.length > 0) {
+      send(ws, {
+        type: 'diff_ready',
+        conversationId,
+        files: response.modifiedFiles,
+      });
+    }
+  } catch (error) {
+    send(ws, {
+      type: 'chat_error',
+      conversationId,
+      error: error instanceof Error ? error.message : 'Chat failed',
+    });
+    throw error;
+  }
+
+  return runner;
+}
+
+async function handleRetryMessage(
+  ws: AuthenticatedSocket,
+  conversationId: string
+): Promise<ClaudeCliRunner> {
+  const db = getDb();
+
+  // Get the last user message from the conversation
+  interface MessageRow {
+    content: string;
+  }
+
+  const lastUserMessage = db
+    .prepare(
+      `
+    SELECT content
+    FROM messages
+    WHERE conversation_id = ? AND role = 'user'
+    ORDER BY created_at DESC
+    LIMIT 1
+  `
+    )
+    .get(conversationId) as MessageRow | undefined;
+
+  if (!lastUserMessage) {
+    send(ws, { type: 'chat_error', error: 'No messages to retry' });
+    throw new Error('No messages to retry');
+  }
+
+  // Get the conversation's workspace
+  interface ConversationRow {
+    workspace_id: string;
+  }
+
+  const conversation = db
+    .prepare('SELECT workspace_id FROM conversations WHERE id = ?')
+    .get(conversationId) as ConversationRow | undefined;
+
+  if (!conversation) {
+    send(ws, { type: 'chat_error', error: 'Conversation not found' });
+    throw new Error('Conversation not found');
+  }
+
+  const workspace = getWorkspace(conversation.workspace_id);
+  if (!workspace) {
+    send(ws, { type: 'chat_error', error: 'Workspace not found' });
+    throw new Error('Workspace not found');
+  }
+
+  // Create a new conversation for the retry
+  const newConversationId = generateId('conv');
+  db.prepare(
+    `
+    INSERT INTO conversations (id, workspace_id, title)
+    VALUES (?, ?, ?)
+  `
+  ).run(newConversationId, workspace.id, `Retry: ${lastUserMessage.content.slice(0, 40)}...`);
+
+  send(ws, {
+    type: 'conversation_created',
+    conversationId: newConversationId,
+    isRetry: true,
+    originalConversationId: conversationId,
+  });
+
+  // Re-use the chat message handler with the new conversation
+  return handleChatMessage(ws, {
+    type: 'chat_send',
+    conversationId: newConversationId,
+    message: lastUserMessage.content,
+  });
 }
