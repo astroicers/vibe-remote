@@ -1,3 +1,8 @@
+// Clear CLAUDECODE env var to allow nested Claude Code sessions
+// This is needed when the server runs inside a Claude Code VS Code extension session
+// The SDK's CLI will refuse to start if CLAUDECODE is set
+delete process.env.CLAUDECODE;
+
 import express from 'express';
 import cors from 'cors';
 import expressWs from 'express-ws';
