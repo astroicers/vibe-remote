@@ -26,13 +26,13 @@ export async function createDiffReview(
   const id = generateId('diff');
   const now = new Date().toISOString();
 
-  // Create diff review record
+  // Create diff review record (use NULL for empty conversationId to satisfy foreign key)
   db.prepare(
     `
     INSERT INTO diff_reviews (id, conversation_id, workspace_id, status, files_json)
     VALUES (?, ?, ?, 'pending', ?)
   `
-  ).run(id, conversationId, workspaceId, JSON.stringify(summary.files));
+  ).run(id, conversationId || null, workspaceId, JSON.stringify(summary.files));
 
   return {
     id,
