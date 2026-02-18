@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { verifyToken } from '../auth/jwt.js';
 import { getDb, generateId } from '../db/index.js';
 import { getActiveWorkspace, getWorkspace } from '../workspace/index.js';
-import { ClaudeCliRunner, StreamEvent } from '../ai/claude-cli.js';
+import { ClaudeSdkRunner, StreamEvent } from '../ai/claude-sdk.js';
 import {
   getConversationHistory,
   saveMessage,
@@ -75,7 +75,7 @@ function send(ws: WebSocket, data: Record<string, unknown>): void {
 
 export function handleChatWebSocket(ws: AuthenticatedSocket): void {
   let isProcessing = false;
-  let currentRunner: ClaudeCliRunner | null = null;
+  let currentRunner: ClaudeSdkRunner | null = null;
 
   ws.on('message', async (data) => {
     let parsed: unknown;
@@ -233,7 +233,7 @@ export function handleChatWebSocket(ws: AuthenticatedSocket): void {
   });
 
   ws.on('close', () => {
-    // Abort any running Claude CLI process
+    // Abort any running Claude SDK query
     if (currentRunner) {
       currentRunner.abort();
     }
@@ -258,7 +258,7 @@ export function handleChatWebSocket(ws: AuthenticatedSocket): void {
 async function handleChatMessage(
   ws: AuthenticatedSocket,
   data: z.infer<typeof chatMessageSchema>
-): Promise<ClaudeCliRunner> {
+): Promise<ClaudeSdkRunner> {
   const db = getDb();
 
   // Get or create conversation
@@ -338,8 +338,8 @@ async function handleChatMessage(
 
   const prompt = `${data.message}${contextFiles}${historyContext}`;
 
-  // Create Claude CLI runner
-  const runner = new ClaudeCliRunner();
+  // Create Claude SDK runner
+  const runner = new ClaudeSdkRunner();
 
   // Accumulate response for saving
   let fullText = '';
@@ -394,7 +394,7 @@ async function handleChatMessage(
     }
   });
 
-  // Run Claude CLI
+  // Run Claude SDK
   try {
     const response = await runner.run(prompt, {
       workspacePath: workspace.path,
@@ -450,7 +450,7 @@ async function handleChatMessage(
 async function handleRetryMessage(
   ws: AuthenticatedSocket,
   conversationId: string
-): Promise<ClaudeCliRunner> {
+): Promise<ClaudeSdkRunner> {
   const db = getDb();
 
   // Get the last user message from the conversation

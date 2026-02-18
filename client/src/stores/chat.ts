@@ -4,9 +4,27 @@ import { create } from 'zustand';
 import { chat, type Conversation, type Message } from '../services/api';
 import { ws, sendChatMessage } from '../services/websocket';
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  costUsd: number;
+}
+
+export interface PendingToolApproval {
+  toolId: string;
+  name: string;
+  input: Record<string, unknown>;
+  title: string;
+  description: string;
+  risk: 'low' | 'medium' | 'high';
+}
+
 interface ChatMessage extends Message {
   isStreaming?: boolean;
   streamedContent?: string;
+  tokenUsage?: TokenUsage;
 }
 
 interface ChatState {
@@ -21,12 +39,23 @@ interface ChatState {
   streamingMessage: string;
   isStreaming: boolean;
 
+  // Token usage from last completed message
+  lastTokenUsage: TokenUsage | null;
+  showTokenUsage: boolean;
+
+  // Tool approval
+  pendingApprovals: PendingToolApproval[];
+
   // Actions
   loadConversations: () => Promise<void>;
   loadConversation: (id: string) => Promise<void>;
   createConversation: () => Promise<string>;
   sendMessage: (content: string, selectedFiles?: string[]) => void;
+  retryConversation: (conversationId: string) => void;
   clearError: () => void;
+  dismissTokenUsage: () => void;
+  approveToolUse: (toolId: string) => void;
+  rejectToolUse: (toolId: string, reason?: string) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => {
@@ -64,8 +93,9 @@ export const useChatStore = create<ChatState>((set, get) => {
       console.log('Tool result:', data.tool, data.isError ? 'ERROR' : 'OK');
     });
 
-    ws.on('chat_complete', (_data) => {
+    ws.on('chat_complete', (data) => {
       const { streamingMessage } = get();
+      const tokenUsage = data.tokenUsage as TokenUsage | undefined;
 
       // Add completed message to messages
       const newMessage: ChatMessage = {
@@ -73,6 +103,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         role: 'assistant',
         content: streamingMessage,
         created_at: new Date().toISOString(),
+        tokenUsage,
       };
 
       set((state) => ({
@@ -80,6 +111,8 @@ export const useChatStore = create<ChatState>((set, get) => {
         streamingMessage: '',
         isStreaming: false,
         isSending: false,
+        lastTokenUsage: tokenUsage || null,
+        showTokenUsage: !!tokenUsage,
       }));
 
       // Refresh conversations list
@@ -98,6 +131,27 @@ export const useChatStore = create<ChatState>((set, get) => {
       console.log('Diff ready:', data.files);
       // Could trigger navigation to diff page or show notification
     });
+
+    ws.on('tool_approval_request', (data) => {
+      const approval: PendingToolApproval = {
+        toolId: data.toolId as string,
+        name: data.name as string,
+        input: data.input as Record<string, unknown>,
+        title: data.title as string,
+        description: data.description as string,
+        risk: data.risk as 'low' | 'medium' | 'high',
+      };
+      set((state) => ({
+        pendingApprovals: [...state.pendingApprovals, approval],
+      }));
+    });
+
+    ws.on('tool_approval_confirmed', (data) => {
+      const toolId = data.toolId as string;
+      set((state) => ({
+        pendingApprovals: state.pendingApprovals.filter((a) => a.toolId !== toolId),
+      }));
+    });
   };
 
   // Setup handlers when module loads
@@ -112,6 +166,9 @@ export const useChatStore = create<ChatState>((set, get) => {
     error: null,
     streamingMessage: '',
     isStreaming: false,
+    lastTokenUsage: null,
+    showTokenUsage: false,
+    pendingApprovals: [],
 
     loadConversations: async () => {
       set({ isLoading: true, error: null });
@@ -174,5 +231,40 @@ export const useChatStore = create<ChatState>((set, get) => {
     },
 
     clearError: () => set({ error: null }),
+
+    dismissTokenUsage: () => set({ showTokenUsage: false }),
+
+    retryConversation: (conversationId: string) => {
+      set({ isSending: true, error: null });
+      ws.send({
+        type: 'chat_retry',
+        conversationId,
+      });
+    },
+
+    approveToolUse: (toolId: string) => {
+      ws.send({
+        type: 'tool_approval_response',
+        toolId,
+        approved: true,
+      });
+      // Optimistically remove from pending
+      set((state) => ({
+        pendingApprovals: state.pendingApprovals.filter((a) => a.toolId !== toolId),
+      }));
+    },
+
+    rejectToolUse: (toolId: string, reason?: string) => {
+      ws.send({
+        type: 'tool_approval_response',
+        toolId,
+        approved: false,
+        reason,
+      });
+      // Optimistically remove from pending
+      set((state) => ({
+        pendingApprovals: state.pendingApprovals.filter((a) => a.toolId !== toolId),
+      }));
+    },
   };
 });

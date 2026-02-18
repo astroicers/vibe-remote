@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageList, ChatInput } from '../components/chat';
+import { MessageList, ChatInput, TokenUsageCard, ToolApprovalCard } from '../components/chat';
 import { QuickActions } from '../components/actions';
 import { useChatStore } from '../stores/chat';
 import { useAuthStore } from '../stores/auth';
@@ -18,6 +18,14 @@ export function ChatPage() {
     error,
     sendMessage,
     clearError,
+    lastTokenUsage,
+    showTokenUsage,
+    dismissTokenUsage,
+    currentConversation,
+    retryConversation,
+    pendingApprovals,
+    approveToolUse,
+    rejectToolUse,
   } = useChatStore();
   const { loadActiveWorkspace, loadGitStatus } = useWorkspaceStore();
 
@@ -97,8 +105,19 @@ export function ChatPage() {
 
       {/* Error banner */}
       {error && (
-        <div className="px-4 py-2 bg-danger/20 text-danger text-sm flex items-center justify-between">
-          <span>{error}</span>
+        <div className="px-4 py-2 bg-danger/20 text-danger text-sm flex items-center gap-2">
+          <span className="flex-1">{error}</span>
+          {currentConversation && (
+            <button
+              onClick={() => {
+                clearError();
+                retryConversation(currentConversation.id);
+              }}
+              className="px-3 py-1 bg-danger/30 hover:bg-danger/40 rounded-full text-xs font-medium transition-colors"
+            >
+              Retry
+            </button>
+          )}
           <button onClick={clearError} className="w-6 h-6 flex items-center justify-center text-danger hover:text-danger/80">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
               <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
@@ -113,6 +132,25 @@ export function ChatPage() {
         streamingMessage={streamingMessage}
         isStreaming={isStreaming}
       />
+
+      {/* Token Usage Card */}
+      {showTokenUsage && lastTokenUsage && (
+        <TokenUsageCard
+          tokenUsage={lastTokenUsage}
+          onDismiss={dismissTokenUsage}
+        />
+      )}
+
+      {/* Pending Tool Approvals */}
+      {pendingApprovals.map((approval) => (
+        <ToolApprovalCard
+          key={approval.toolId}
+          approval={approval}
+          onApprove={approveToolUse}
+          onReject={rejectToolUse}
+          isProcessing={isSending}
+        />
+      ))}
 
       {/* Input */}
       <ChatInput

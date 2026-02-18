@@ -1,9 +1,24 @@
-// AI Engine Module
+// AI Engine Module - Claude Agent SDK Integration
 
-export { streamChat, simpleChat, generateCommitMessage, generatePRDescription } from './claude.js';
-export type { StreamCallbacks, ChatOptions } from './claude.js';
-export { buildFullSystemPrompt, buildProjectContext, buildSystemPrompt } from './context-builder.js';
-export { toolDefinitions, executeTool, getModifiedFiles, clearModifiedFiles } from './tools.js';
+export {
+  ClaudeSdkRunner,
+  generateCommitMessage,
+  generatePRDescription,
+} from './claude-sdk.js';
+
+export type {
+  ClaudeSdkOptions,
+  StreamEvent,
+  ChatResponse,
+  TokenUsage,
+} from './claude-sdk.js';
+
+export {
+  buildFullSystemPrompt,
+  buildProjectContext,
+  buildSystemPrompt,
+} from './context-builder.js';
+
 export type {
   AIMessage,
   ContentBlock,

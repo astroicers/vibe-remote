@@ -10,9 +10,12 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default('7d'),
 
-  // Anthropic
-  ANTHROPIC_API_KEY: z.string().startsWith('sk-ant-'),
-  ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-20250514'),
+  // Claude Agent SDK
+  CLAUDE_CODE_OAUTH_TOKEN: z.string().optional(), // OAuth token from `claude setup-token`
+  CLAUDE_MODEL: z.string().default('claude-sonnet-4-20250514'),
+  CLAUDE_PERMISSION_MODE: z
+    .enum(['default', 'acceptEdits', 'bypassPermissions'])
+    .default('bypassPermissions'),
 
   // Database
   DATABASE_PATH: z.string().default('./data/vibe-remote.db'),
