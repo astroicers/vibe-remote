@@ -78,36 +78,43 @@ Port 3000:
 
 ### 2. AI Engine
 
-負責與 Claude API 溝通，是整個系統的核心。
+負責透過 Claude Agent SDK 執行 AI 任務，是整個系統的核心。
 
 ```
 AI Engine
-├── claude-client.ts      # Anthropic SDK wrapper
-│   ├── sendMessage()     # Streaming completion
-│   ├── handleToolUse()   # Tool call loop
-│   └── cancelRequest()   # 中斷正在進行的請求
+├── claude-sdk.ts         # Claude Agent SDK wrapper
+│   ├── createConversation()  # 建立新對話
+│   ├── sendMessage()         # 發送訊息並處理 streaming 回應
+│   ├── resumeSession()       # 使用 session ID 恢復對話（節省 token）
+│   └── generateCommitMessage()   # 用 SDK 生成 commit message
 │
 ├── context-builder.ts    # 組裝 AI context
 │   ├── getProjectContext()
 │   │   ├── 讀 workspace 的 file tree (filtered by .gitignore)
-│   │   ├── 讀 git status + recent commits
+│   │   ├── 讀 git status + recent commits (最近 3 筆)
 │   │   ├── 讀 package.json / tsconfig.json (key config files)
 │   │   └── 如果 workspace 有 system prompt，加入
 │   ├── getFileContext()
-│   │   └── 使用者手動選擇的 context files 內容
+│   │   └── 使用者手動選擇的 context files 內容 (1MB 限制)
 │   └── getConversationContext()
-│       └── 最近 N 輪對話歷史
+│       └── 最近 5 輪對話歷史（每則截斷至 2000 字元）
 │
-├── tool-executor.ts      # AI tool use 執行器
-│   ├── file_read         # 讀取檔案
-│   ├── file_write        # 寫入/建立檔案
-│   ├── file_edit         # 精確編輯（search & replace）
-│   ├── terminal_run      # 執行終端指令（有白名單）
-│   ├── search_codebase   # ripgrep 搜尋
-│   └── git_diff          # 查看當前 diff
+├── utils/truncate.ts     # Token 優化工具
+│   ├── truncateMessage()     # 截斷單則訊息
+│   ├── truncateHistory()     # 截斷對話歷史
+│   └── checkFileSize()       # 檢查檔案大小
 │
-└── prompt-templates.ts   # 預定義 prompt 範本管理
+└── types.ts              # AI 相關 TypeScript 類型定義
 ```
+
+**Token 優化策略**（已實作）：
+- **Session Resume**：使用 SDK 的 `resumeSessionId` 恢復對話，減少 60-80% input tokens
+- **訊息截斷**：歷史訊息限制 5 則，每則 2000 字元
+- **檔案大小限制**：context files 超過 1MB 會跳過並通知使用者
+- **Context Builder 優化**：減少 file tree 深度(2層)、commits(3筆)、maxFileChars(10000)
+
+**注意**：Tool execution 由 Claude Agent SDK 內建處理，不需要自行實作 tool executor。
+SDK 內建的 tools 包括：Read, Edit, Write, Bash, Grep, Glob 等。
 
 **AI 互動流程（一次 chat message）**：
 
@@ -116,16 +123,13 @@ AI Engine
 2. context-builder 組裝 system prompt:
    ├── Base system prompt (你是一個 coding assistant...)
    ├── Project context (file tree, git info)
-   ├── User-selected file contents
+   ├── User-selected file contents (1MB 限制)
    └── Workspace system prompt (if any)
-3. 附上對話歷史 (最近 20 輪)
-4. 呼叫 Claude API (streaming)
-5. 每收到一個 chunk → WebSocket 即時送到 client
-6. 如果 AI 回覆包含 tool_use:
-   ├── tool-executor 執行對應操作
-   ├── 將 tool result 送回 Claude
-   └── 重複步驟 4-6 直到 AI 不再呼叫 tool
-7. AI 完成回覆 → 存入 SQLite
+3. 檢查是否有 session ID 可恢復（Session Resume）
+4. 呼叫 Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`)
+5. 處理 streaming events → WebSocket 即時送到 client
+6. SDK 內部處理 tool_use loop（Read, Edit, Bash 等），server 轉發事件
+7. 完成後儲存 session ID + token usage → SQLite
 8. 如果有檔案被修改 → 自動產生 diff → 推送 diff_ready event
 ```
 
@@ -289,8 +293,8 @@ services:
       - ~/.ssh:/root/.ssh:ro            # Git SSH key
       - ~/.gitconfig:/root/.gitconfig:ro
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - JWT_SECRET=${JWT_SECRET}
+      - CLAUDE_PERMISSION_MODE=bypassPermissions
 ```
 
 ### 與 code-server 的共存

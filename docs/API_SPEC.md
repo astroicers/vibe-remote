@@ -917,162 +917,438 @@ Reject 指定檔案並附上回饋。被 reject 的檔案會 revert 改動。
 
 ---
 
-## 9. WebSocket Protocol
+## 9. Notifications (Push)
 
-**連線**: `wss://{TAILSCALE_IP}:3000/ws?token={jwt_token}`
+### GET /api/notifications/status
+檢查 push notifications 是否可用。
 
-### Server → Client Events
-
-#### `ai_chunk`
-AI streaming 回覆的每一段。
-
+**Response** `200`:
 ```json
 {
-  "event": "ai_chunk",
-  "data": {
-    "conversationId": "conv_xyz789",
-    "messageId": "msg_bbb222",
-    "type": "text_delta",
-    "content": "I'll add rate limiting using ",
-    "done": false
+  "available": true
+}
+```
+
+---
+
+### GET /api/notifications/vapid-public-key
+取得 VAPID public key 供客戶端訂閱。
+
+**Response** `200`:
+```json
+{
+  "publicKey": "BNx..."
+}
+```
+
+**Error** `503`:
+```json
+{
+  "error": "Push notifications not configured",
+  "code": "PUSH_NOT_AVAILABLE"
+}
+```
+
+---
+
+### POST /api/notifications/subscribe
+訂閱 push notifications。
+
+**Request**:
+```json
+{
+  "endpoint": "https://fcm.googleapis.com/fcm/send/...",
+  "keys": {
+    "p256dh": "...",
+    "auth": "..."
   }
 }
 ```
 
-當 `done: true` 時表示完整回覆已結束：
+**Response** `200`:
 ```json
 {
-  "event": "ai_chunk",
-  "data": {
-    "conversationId": "conv_xyz789",
-    "messageId": "msg_bbb222",
-    "type": "message_complete",
-    "done": true,
-    "metadata": {
-      "toolCalls": [...],
-      "filesModified": [...],
-      "tokensUsed": {"input": 2500, "output": 1200}
-    }
-  }
+  "success": true,
+  "subscriptionId": "push_abc123"
 }
 ```
 
-#### `ai_tool_use`
-AI 正在使用工具（讓 UI 顯示進度）。
+---
 
+### DELETE /api/notifications/unsubscribe
+取消訂閱 push notifications。
+
+**Response** `200`:
 ```json
 {
-  "event": "ai_tool_use",
-  "data": {
-    "conversationId": "conv_xyz789",
-    "tool": "file_write",
-    "args": {"path": "src/middleware/rate-limiter.ts"},
-    "status": "executing"
-  }
+  "success": true
 }
 ```
 
-#### `diff_ready`
-有新的 diff 可以 review。
+---
+
+## 10. WebSocket Protocol
+
+**連線**: `wss://{TAILSCALE_IP}:3000/ws`
+
+### 認證
+
+連線後必須先發送 `auth` 訊息：
 
 ```json
 {
-  "event": "diff_ready",
-  "data": {
-    "workspaceId": "ws_abc123",
-    "filesChanged": 3,
-    "insertions": 45,
-    "deletions": 12,
-    "source": "ai_chat"
-  }
+  "type": "auth",
+  "token": "jwt_token_here"
 }
 ```
 
-#### `task_status`
-Task 狀態變更。
-
+成功回應：
 ```json
 {
-  "event": "task_status",
-  "data": {
-    "taskId": "task_eee555",
-    "oldStatus": "running",
-    "newStatus": "awaiting_review",
-    "diffSummary": {
-      "filesChanged": 3,
-      "insertions": 45,
-      "deletions": 12
-    }
-  }
+  "type": "auth_success",
+  "deviceId": "dev_xxx"
 }
 ```
 
-#### `terminal_output`
-Terminal 指令的即時輸出。
-
+失敗回應：
 ```json
 {
-  "event": "terminal_output",
-  "data": {
-    "executionId": "exec_fff666",
-    "chunk": "PASS src/__tests__/rate-limiter.test.ts\n",
-    "done": false
-  }
+  "type": "auth_error",
+  "error": "Invalid token"
 }
 ```
 
-#### `notification`
-通用通知（push notification 也會同時觸發）。
-
-```json
-{
-  "event": "notification",
-  "data": {
-    "type": "task_complete",
-    "title": "Task completed",
-    "body": "Add rate limiting — ready for review",
-    "taskId": "task_eee555",
-    "timestamp": "2025-03-01T07:45:00Z"
-  }
-}
-```
-
-#### `file_changed`
-Workspace 中有檔案變更（by file watcher）。
-
-```json
-{
-  "event": "file_changed",
-  "data": {
-    "workspaceId": "ws_abc123",
-    "type": "modify",
-    "path": "src/index.ts"
-  }
-}
-```
+---
 
 ### Client → Server Events
+
+#### `chat_send`
+送出訊息給 AI。
+
+```json
+{
+  "type": "chat_send",
+  "conversationId": "conv_xyz789",
+  "message": "Add rate limiting middleware",
+  "selectedFiles": ["src/index.ts"]
+}
+```
+
+**說明**: `conversationId` 為空時會建立新對話。
+
+---
+
+#### `chat_retry`
+重試對話中最後一個使用者訊息。會建立新對話來執行重試。
+
+```json
+{
+  "type": "chat_retry",
+  "conversationId": "conv_xyz789"
+}
+```
+
+---
+
+#### `tool_approval_response`
+回應工具審批請求（當 permission mode 非 bypassPermissions 時）。
+
+```json
+{
+  "type": "tool_approval_response",
+  "toolId": "tool_abc123",
+  "approved": true,
+  "modifiedInput": null,
+  "reason": null
+}
+```
+
+**說明**:
+- `approved: true` — 批准工具執行
+- `approved: false` — 拒絕工具執行，`reason` 提供拒絕原因
+- `modifiedInput` — 可選，修改後的工具輸入參數
+
+---
 
 #### `ping`
 心跳。Server 回覆 `pong`。
 
 ```json
 {
-  "event": "ping"
+  "type": "ping"
 }
 ```
 
-#### `subscribe_workspace`
-訂閱特定 workspace 的即時更新。
+---
+
+### Server → Client Events
+
+#### `connected`
+連線成功後立即發送。
 
 ```json
 {
-  "event": "subscribe_workspace",
-  "data": {
-    "workspaceId": "ws_abc123"
+  "type": "connected",
+  "timestamp": "2025-03-01T10:00:00Z",
+  "message": "Welcome to Vibe Remote"
+}
+```
+
+---
+
+#### `conversation_created`
+新對話建立。
+
+```json
+{
+  "type": "conversation_created",
+  "conversationId": "conv_xyz789",
+  "isRetry": false,
+  "originalConversationId": null
+}
+```
+
+**說明**: `isRetry: true` 時表示這是重試對話，`originalConversationId` 為原始對話 ID。
+
+---
+
+#### `chat_start`
+AI 開始處理訊息。
+
+```json
+{
+  "type": "chat_start",
+  "conversationId": "conv_xyz789"
+}
+```
+
+---
+
+#### `chat_chunk`
+
+AI streaming 回覆的文字片段。
+
+```json
+{
+  "type": "chat_chunk",
+  "conversationId": "conv_xyz789",
+  "text": "I'll add rate limiting using "
+}
+```
+
+---
+
+#### `tool_use`
+
+AI 正在使用工具。
+
+```json
+{
+  "type": "tool_use",
+  "conversationId": "conv_xyz789",
+  "tool": "Edit",
+  "input": {
+    "file_path": "src/middleware/rate-limiter.ts",
+    "old_string": "...",
+    "new_string": "..."
   }
 }
 ```
+
+---
+
+#### `tool_result`
+
+工具執行結果。
+
+```json
+{
+  "type": "tool_result",
+  "conversationId": "conv_xyz789",
+  "result": { ... }
+}
+```
+
+---
+
+#### `tool_approval_request`
+
+工具需要使用者審批（當 permission mode 非 bypassPermissions 時）。
+
+```json
+{
+  "type": "tool_approval_request",
+  "toolId": "tool_abc123",
+  "conversationId": "conv_xyz789",
+  "tool": {
+    "name": "Bash",
+    "input": { "command": "npm test" },
+    "description": "Execute Command",
+    "risk": "high"
+  }
+}
+```
+
+**說明**: Client 應顯示審批 modal，使用者決定後發送 `tool_approval_response`。
+
+---
+
+#### `tool_approval_confirmed`
+
+工具審批已處理。
+
+```json
+{
+  "type": "tool_approval_confirmed",
+  "toolId": "tool_abc123",
+  "approved": true
+}
+```
+
+---
+
+#### `chat_complete`
+
+AI 回覆完成。
+
+```json
+{
+  "type": "chat_complete",
+  "conversationId": "conv_xyz789",
+  "modifiedFiles": ["src/middleware/rate-limiter.ts"],
+  "tokenUsage": {
+    "inputTokens": 2500,
+    "outputTokens": 1200,
+    "cacheReadTokens": 15000,
+    "cacheCreationTokens": 18000,
+    "costUsd": 0.121237
+  }
+}
+```
+
+**說明**: `tokenUsage` 包含本次對話的 token 使用量和成本（USD）。
+
+---
+
+#### `chat_error`
+
+AI 處理錯誤。
+
+```json
+{
+  "type": "chat_error",
+  "conversationId": "conv_xyz789",
+  "error": "Claude CLI exited with code 1"
+}
+```
+
+---
+
+#### `diff_ready`
+
+有新的 diff 可以 review（AI 修改了檔案）。
+
+```json
+{
+  "type": "diff_ready",
+  "conversationId": "conv_xyz789",
+  "files": ["src/middleware/rate-limiter.ts", "src/index.ts"]
+}
+```
+
+---
+
+#### `task_status`
+
+Task 狀態變更（Phase 2）。
+
+```json
+{
+  "type": "task_status",
+  "taskId": "task_eee555",
+  "oldStatus": "running",
+  "newStatus": "awaiting_review",
+  "diffSummary": {
+    "filesChanged": 3,
+    "insertions": 45,
+    "deletions": 12
+  }
+}
+```
+
+---
+
+#### `terminal_output`
+
+Terminal 指令的即時輸出。
+
+```json
+{
+  "type": "terminal_output",
+  "executionId": "exec_fff666",
+  "chunk": "PASS src/__tests__/rate-limiter.test.ts\n",
+  "done": false
+}
+```
+
+---
+
+#### `notification`
+
+通用通知（push notification 也會同時觸發）。
+
+```json
+{
+  "type": "notification",
+  "notificationType": "task_complete",
+  "title": "Task completed",
+  "body": "Add rate limiting — ready for review",
+  "taskId": "task_eee555",
+  "timestamp": "2025-03-01T07:45:00Z"
+}
+```
+
+---
+
+#### `file_changed`
+
+Workspace 中有檔案變更（by file watcher）。
+
+```json
+{
+  "type": "file_changed",
+  "workspaceId": "ws_abc123",
+  "changeType": "modify",
+  "path": "src/index.ts"
+}
+```
+
+---
+
+#### `error`
+
+通用錯誤。
+
+```json
+{
+  "type": "error",
+  "error": "Unknown message type"
+}
+```
+
+---
+
+#### `pong`
+
+心跳回應。
+
+```json
+{
+  "type": "pong"
+}
+```
+
+---
 
 ### 重連策略
 

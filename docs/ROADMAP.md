@@ -1,134 +1,98 @@
 # Roadmap — Vibe Remote
 
-## Phase 1 — MVP：通勤時可以 Vibe Code
+## Phase 1 — MVP：通勤時可以 Vibe Code ✅ 完成
 
 **目標**：能在手機上與 AI 對話、review diff、commit + push。
 
-**總預估時間**：4-6 週
+**狀態**：✅ 全部完成（2026-02-18）
 
 ---
 
-### Sprint 1.1 — 基礎骨架（Week 1）
+### Sprint 1.1 — 基礎骨架 ✅
 
-**目標**：Project scaffold，server + client 可以啟動。
-
-| Task | 驗收標準 |
-|------|---------|
-| 初始化 monorepo 結構 | `npm run dev` 可同時啟動 server + client |
-| Server: Express + WebSocket server | `GET /api/health` return `{ status: "ok" }` |
-| Client: React + Vite + Tailwind | 首頁顯示 "Vibe Remote" |
-| Shared types 設定 | Server/Client 可 import `@shared/types` |
-| SQLite 初始化 + migration runner | Server 啟動時自動建表 |
-| .env + config 管理 | `config.ts` export 所有設定 |
-| Docker + docker-compose | `docker compose up` 可啟動 |
-
-**產出**：可啟動的空殼 app，所有基礎設施就位。
+| Task | 狀態 |
+|------|------|
+| 初始化 monorepo 結構 | ✅ |
+| Server: Express + WebSocket server | ✅ |
+| Client: React + Vite + Tailwind | ✅ |
+| Shared types 設定 | ✅ |
+| SQLite 初始化 + migration runner | ✅ |
+| .env + config 管理 | ✅ |
+| Docker + docker-compose | ✅ |
 
 ---
 
-### Sprint 1.2 — Auth + Workspace（Week 2）
+### Sprint 1.2 — Auth + Workspace ✅
 
-**目標**：手機可以安全連上 server，看到 workspace 列表。
-
-| Task | 驗收標準 |
-|------|---------|
-| JWT 簽發/驗證/refresh | Token lifecycle 完整 |
-| QR code pairing flow | 電腦顯示 QR → 手機掃碼 → 取得 token |
-| Auth middleware | 未認證的 request 回 401 |
-| Workspace CRUD API | 可註冊/列出/查詢 workspace |
-| File tree API | 可取得 workspace 的目錄結構（filtered） |
-| Git status API | 可看到 branch、uncommitted files |
-| Client: Repos page | 手機上看到 workspace 卡片列表 |
-| Client: Bottom navigation | 4 個 tab 可切換 |
-
-**驗收場景**：
-1. 在電腦上打開 /setup → 看到 QR code
-2. 手機掃碼 → 進入 app
-3. 看到已註冊的 workspace 列表
-4. 每個 workspace 顯示 git status
+| Task | 狀態 |
+|------|------|
+| JWT 簽發/驗證/refresh | ✅ |
+| QR code pairing flow | ✅ |
+| Auth middleware | ✅ |
+| Workspace CRUD API | ✅ |
+| File tree API | ✅ |
+| Git status API | ✅ |
+| Client: Repos page | ✅ |
+| Client: Bottom navigation | ✅ |
 
 ---
 
-### Sprint 1.3 — Chat 核心（Week 3）
+### Sprint 1.3 — Chat 核心 ✅
 
-**目標**：可以在手機上與 AI 對話，AI 可以讀寫 workspace 的檔案。
+| Task | 狀態 |
+|------|------|
+| Claude Agent SDK 串接 (streaming) | ✅ |
+| Context builder（含 Token 優化） | ✅ |
+| Session Resume 支援 | ✅ |
+| Tool definitions + executor | ✅ |
+| Tool 安全驗證 | ✅ |
+| Chat REST API + WebSocket | ✅ |
+| 對話持久化 (SQLite) | ✅ |
+| Client: Chat page | ✅ |
+| Client: ChatInput | ✅ |
+| Context file 選擇 | ✅ |
 
-| Task | 驗收標準 |
-|------|---------|
-| Claude API 串接 (streaming) | AI 回覆逐字串流到 client |
-| Context builder | System prompt 包含 project 結構 + git info |
-| Tool definitions + executor | AI 可 file_read、file_write、file_edit、terminal_run、search_codebase |
-| Tool 安全驗證 | 路徑穿越被阻擋、指令白名單生效 |
-| Chat REST API (send, list, get, delete) | 對話 CRUD 完整 |
-| WebSocket: ai_chunk event | Client 即時收到 AI streaming |
-| 對話持久化 (SQLite) | 關閉重開可看到歷史對話 |
-| Client: Chat page | 全螢幕對話、message bubbles、code highlight |
-| Client: ChatInput | 文字輸入 + 送出 |
-| Context file 選擇 | 可從 file tree 選擇要給 AI 的檔案 |
-
-**驗收場景**：
-1. 在手機上輸入「Add rate limiting to API gateway」
-2. AI 回覆逐字顯示，包含 code blocks
-3. AI 使用 tool 建立/修改檔案
-4. 看到 AI 做了什麼（tool call details）
-5. 回到電腦 → 檔案確實被修改了
+**Token 優化措施**：
+- Session Resume（減少 60-80% token）
+- 訊息截斷（2000 字元 / 5 條歷史）
+- 檔案大小限制（1MB）
+- Context Builder 精簡（深度 2、commits 3）
 
 ---
 
-### Sprint 1.4 — Diff Review（Week 4）
+### Sprint 1.4 — Diff Review ✅
 
-**目標**：可以在手機上 review AI 的改動、approve/reject。
-
-| Task | 驗收標準 |
-|------|---------|
-| Diff API (get/approve/reject/approve-all) | Diff CRUD 完整 |
-| AI 修改後自動產生 diff | Tool 修改檔案 → diff_ready event |
-| Reject + comment → 回饋 AI | AI 收到回饋後重改 |
-| Client: Diff page | Unified diff view，行號 + 紅綠色 |
-| Client: File-by-file navigation | 左右滑動或 dots 切換 |
-| Client: Approve/Reject/Comment buttons | 大按鈕，觸控友善 |
-| Client: Approve All | 一鍵全部 approve |
-| Diff review 狀態持久化 | SQLite diff_reviews 表 |
-
-**驗收場景**：
-1. AI 修改了 3 個檔案
-2. 收到 diff_ready → Diff tab 顯示 badge (3)
-3. 點進去 → 逐檔瀏覽 diff
-4. Approve 2 個、Reject 1 個（附 comment）
-5. AI 根據 comment 重改
-6. 新 diff 推送 → review 新版本
-7. 全部 approve
+| Task | 狀態 |
+|------|------|
+| Diff API (get/approve/reject/approve-all) | ✅ |
+| AI 修改後自動產生 diff | ✅ |
+| Reject + comment → 回饋 AI | ✅ |
+| Client: Diff page | ✅ |
+| Client: File-by-file navigation | ✅ |
+| Client: Approve/Reject/Comment buttons | ✅ |
+| Client: Approve All | ✅ |
+| Diff review 狀態持久化 | ✅ |
 
 ---
 
-### Sprint 1.5 — Git Actions + Voice + PWA（Week 5-6）
+### Sprint 1.5 — Git Actions + PWA ✅
 
-**目標**：可以 commit + push、語音輸入、安裝為 PWA。
+| Task | 狀態 |
+|------|------|
+| Git commit API | ✅ |
+| Git push API | ✅ |
+| Git pull API | ✅ |
+| Git branch API (create/switch) | ✅ |
+| Discard changes API | ✅ |
+| Client: Quick Actions | ✅ |
+| Client: Commit sheet | ✅ |
+| PWA manifest + service worker | ✅ |
+| Push notifications | ✅ |
+| 連線狀態指示器 | ✅ |
 
-| Task | 驗收標準 |
-|------|---------|
-| Git commit API（含 AI 自動 message） | 一鍵 commit |
-| Git push API | 一鍵 push |
-| Git pull API | 一鍵 pull |
-| Git branch API (create/switch) | 可切換/建立 branch |
-| Create PR API (GitHub) | AI 產生 PR description |
-| Discard changes API（二次確認） | 可還原改動 |
-| Client: Quick Actions | Repos page 展開操作按鈕 |
-| Client: Commit sheet | 全部 approved 後顯示 commit UI |
-| Voice input (Web Speech API) | 🎤 按鈕 → 語音轉文字 → 輸入框 |
-| Prompt templates | 水平捲動的快速 prompt 按鈕 |
-| PWA manifest + service worker | 可「加到主畫面」 |
-| Push notifications | Task/diff 完成時推送 |
-| 連線狀態指示器 | 斷線顯示紅色條 |
-
-**驗收場景（完整 flow）**：
-1. 📱 打開 PWA（已安裝到桌面）
-2. 🎤 語音輸入：「幫我在 auth service 加上 rate limiting」
-3. AI 在背景工作
-4. 📝 收到通知 → 看 diff → 逐檔 approve
-5. 📦 一鍵 commit（AI 自動產生 message）
-6. 🚀 一鍵 push
-7. 💻 回到電腦 → git pull → 改動都在
+**暫緩項目**：
+- Voice input (Web Speech API) — 需要更多 UX 設計
+- Create PR API — Phase 3 再處理
 
 ---
 

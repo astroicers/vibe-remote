@@ -301,4 +301,31 @@ export const diff = {
     }),
 };
 
+// Notifications API
+export interface PushSubscription {
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+}
+
+export const notifications = {
+  getVapidPublicKey: () =>
+    request<{ publicKey: string }>('/notifications/vapid-public-key'),
+
+  getStatus: () => request<{ available: boolean }>('/notifications/status'),
+
+  subscribe: (subscription: PushSubscription) =>
+    request<{ success: boolean; subscriptionId: string }>('/notifications/subscribe', {
+      method: 'POST',
+      json: subscription,
+    }),
+
+  unsubscribe: () =>
+    request<{ success: boolean }>('/notifications/unsubscribe', {
+      method: 'DELETE',
+    }),
+};
+
 export { ApiError };

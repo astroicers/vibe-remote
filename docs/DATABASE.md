@@ -49,18 +49,36 @@ CREATE UNIQUE INDEX idx_workspaces_active
 
 ```sql
 CREATE TABLE conversations (
-  id            TEXT PRIMARY KEY,           -- 'conv_' + nanoid(12)
-  workspace_id  TEXT NOT NULL,
-  title         TEXT,                       -- 由第一則 user message 的前 50 字或 AI 摘要
-  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
-  
+  id              TEXT PRIMARY KEY,           -- 'conv_' + nanoid(12)
+  workspace_id    TEXT NOT NULL,
+  title           TEXT,                       -- 由第一則 user message 的前 50 字或 AI 摘要
+  token_usage     TEXT,                       -- JSON: { input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost_usd }
+  sdk_session_id  TEXT,                       -- Claude Agent SDK session ID for resume
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+
   FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_conversations_workspace ON conversations(workspace_id);
 CREATE INDEX idx_conversations_updated ON conversations(updated_at DESC);
 ```
+
+**token_usage JSON 結構**:
+```json
+{
+  "inputTokens": 2500,
+  "outputTokens": 1200,
+  "cacheReadTokens": 15000,
+  "cacheCreationTokens": 18000,
+  "costUsd": 0.121237
+}
+```
+
+**sdk_session_id 用途**:
+- 儲存 Claude Agent SDK 的 session ID
+- 用於 Session Resume 功能，減少後續對話的 token 消耗
+- 第一次對話後儲存，後續對話使用 `resumeSessionId` 參數
 
 ### messages — 對話訊息
 
