@@ -4,6 +4,7 @@ import { DiffPage } from './pages/DiffPage';
 import { TasksPage } from './pages/TasksPage';
 import { ReposPage } from './pages/ReposPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ToastContainer } from './components/Toast';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/repos" element={<ReposPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Routes>
+      <ToastContainer />
     </div>
   );
 }

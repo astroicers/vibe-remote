@@ -83,13 +83,10 @@ export class ClaudeSdkRunner extends EventEmitter {
       maxTurns: options.maxTurns || 20,
       abortController: this.abortController,
       includePartialMessages: true, // Enable streaming
-      persistSession: true, // Enable session persistence for resume
+      // NOTE: Session resume disabled — SDK's persistSession/resume doesn't work
+      // reliably in Docker (session files not found across spawned processes).
+      // History is sent inline instead. Re-enable when SDK supports stable resume.
     };
-
-    // Handle session resume
-    if (options.resumeSessionId) {
-      sdkOptions.resume = options.resumeSessionId;
-    }
 
     // Handle permission mode
     if (options.permissionMode === 'bypassPermissions') {

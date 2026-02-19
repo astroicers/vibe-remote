@@ -3,7 +3,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../auth/middleware.js';
-import { getActiveWorkspace } from '../workspace/index.js';
+import { getWorkspace } from '../workspace/index.js';
 import { getDb, generateId } from '../db/index.js';
 import type { AIMessage } from '../ai/types.js';
 
@@ -13,13 +13,12 @@ const router = Router();
 router.use(authMiddleware);
 
 // List conversations for a workspace
-router.get('/conversations', (_req, res) => {
-  const workspace = getActiveWorkspace();
-
-  if (!workspace) {
+router.get('/conversations', (req, res) => {
+  const workspaceId = req.query.workspaceId as string | undefined;
+  if (!workspaceId) {
     res.status(400).json({
-      error: 'No active workspace',
-      code: 'NO_ACTIVE_WORKSPACE',
+      error: 'workspaceId is required',
+      code: 'MISSING_WORKSPACE_ID',
     });
     return;
   }
@@ -35,7 +34,7 @@ router.get('/conversations', (_req, res) => {
     LIMIT 50
   `
     )
-    .all(workspace.id);
+    .all(workspaceId);
 
   res.json(conversations);
 });
@@ -89,7 +88,7 @@ router.get('/conversations/:id', (req, res) => {
 // Create new conversation
 const createConversationSchema = z.object({
   title: z.string().optional(),
-  workspaceId: z.string().optional(),
+  workspaceId: z.string(),
 });
 
 router.post('/conversations', (req, res) => {
@@ -97,24 +96,22 @@ router.post('/conversations', (req, res) => {
 
   if (!parsed.success) {
     res.status(400).json({
-      error: 'Invalid request',
+      error: 'Invalid request: workspaceId is required',
       code: 'VALIDATION_ERROR',
     });
     return;
   }
 
-  let workspaceId = parsed.data.workspaceId;
+  const workspaceId = parsed.data.workspaceId;
 
-  if (!workspaceId) {
-    const activeWorkspace = getActiveWorkspace();
-    if (!activeWorkspace) {
-      res.status(400).json({
-        error: 'No active workspace and no workspace ID provided',
-        code: 'NO_WORKSPACE',
-      });
-      return;
-    }
-    workspaceId = activeWorkspace.id;
+  // Validate workspace exists
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) {
+    res.status(404).json({
+      error: 'Workspace not found',
+      code: 'WORKSPACE_NOT_FOUND',
+    });
+    return;
   }
 
   const db = getDb();
@@ -396,13 +393,21 @@ router.get('/conversations/:id/export', (req, res) => {
 });
 
 // Get aggregated token usage stats for workspace
-router.get('/usage', (_req, res) => {
-  const workspace = getActiveWorkspace();
-
-  if (!workspace) {
+router.get('/usage', (req, res) => {
+  const workspaceId = req.query.workspaceId as string | undefined;
+  if (!workspaceId) {
     res.status(400).json({
-      error: 'No active workspace',
-      code: 'NO_ACTIVE_WORKSPACE',
+      error: 'workspaceId is required',
+      code: 'MISSING_WORKSPACE_ID',
+    });
+    return;
+  }
+
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) {
+    res.status(404).json({
+      error: 'Workspace not found',
+      code: 'WORKSPACE_NOT_FOUND',
     });
     return;
   }
@@ -418,7 +423,7 @@ router.get('/usage', (_req, res) => {
     WHERE workspace_id = ? AND token_usage IS NOT NULL
   `
     )
-    .all(workspace.id) as { token_usage: string }[];
+    .all(workspaceId) as { token_usage: string }[];
 
   // Aggregate token usage
   const totalUsage = {

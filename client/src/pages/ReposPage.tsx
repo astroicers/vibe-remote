@@ -2,22 +2,25 @@
 
 import { useEffect, useState } from 'react';
 import { useWorkspaceStore } from '../stores/workspace';
-import { BottomNav } from '../components/BottomNav';
+import { AppLayout } from '../components/AppLayout';
 import { QuickActions } from '../components/actions/QuickActions';
 
 export function ReposPage() {
   const {
-    activeWorkspace,
     workspaceList,
-    gitStatus,
+    selectedWorkspaceId,
+    gitStateByWorkspace,
     isLoading,
     error,
     loadWorkspaces,
-    loadActiveWorkspace,
-    setActiveWorkspace,
+    selectWorkspace,
     registerWorkspace,
+    loadGitStatus,
     clearError,
   } = useWorkspaceStore();
+
+  const selectedWorkspace = workspaceList.find((w) => w.id === selectedWorkspaceId) ?? null;
+  const gitStatus = selectedWorkspaceId ? gitStateByWorkspace[selectedWorkspaceId]?.gitStatus : null;
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newWorkspacePath, setNewWorkspacePath] = useState('');
@@ -26,8 +29,14 @@ export function ReposPage() {
 
   useEffect(() => {
     loadWorkspaces();
-    loadActiveWorkspace();
-  }, [loadWorkspaces, loadActiveWorkspace]);
+  }, [loadWorkspaces]);
+
+  // Load git status when workspace changes
+  useEffect(() => {
+    if (selectedWorkspaceId) {
+      loadGitStatus(selectedWorkspaceId);
+    }
+  }, [selectedWorkspaceId, loadGitStatus]);
 
   const handleAddWorkspace = async () => {
     if (!newWorkspacePath.trim()) return;
@@ -38,9 +47,9 @@ export function ReposPage() {
     setNewWorkspaceName('');
   };
 
-  const handleSelectWorkspace = async (id: string) => {
-    if (activeWorkspace?.id === id) return;
-    await setActiveWorkspace(id);
+  const handleSelectWorkspace = (id: string) => {
+    if (selectedWorkspaceId === id) return;
+    selectWorkspace(id);
   };
 
   // Folder icon component
@@ -61,22 +70,15 @@ export function ReposPage() {
   const getGitStatusText = (status: typeof gitStatus) => {
     if (!status) return 'Loading...';
 
-    const parts: string[] = [];
     const totalChanges = status.staged + status.unstaged + status.untracked;
-
-    if (totalChanges > 0) {
-      parts.push(`${totalChanges} changes`);
-    } else {
-      parts.push('clean');
-    }
-
-    return parts.join(' • ');
+    if (totalChanges > 0) return `${totalChanges} changes`;
+    return 'clean';
   };
 
   return (
-    <div className="flex flex-col h-screen bg-bg-primary">
+    <AppLayout>
       {/* Header */}
-      <header className="flex items-center px-4 h-14 border-b border-border bg-bg-secondary">
+      <header className="flex items-center px-4 h-14 border-b border-border bg-bg-secondary flex-shrink-0">
         <div className="flex-1">
           <h1 className="text-base font-medium text-text-primary">Workspaces</h1>
         </div>
@@ -102,20 +104,11 @@ export function ReposPage() {
 
       {/* Error Banner */}
       {error && (
-        <div className="mx-4 mt-4 p-3 bg-danger/20 rounded-xl flex items-center justify-between">
+        <div className="mx-4 mt-4 p-3 bg-danger/20 rounded-xl flex items-center justify-between flex-shrink-0">
           <span className="text-sm text-danger">{error}</span>
           <button onClick={clearError} className="text-danger hover:text-danger/80">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="w-4 h-4"
-            >
-              <path
-                fillRule="evenodd"
-                d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z"
-                clipRule="evenodd"
-              />
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+              <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
             </svg>
           </button>
         </div>
@@ -140,55 +133,37 @@ export function ReposPage() {
           </div>
         ) : (
           <>
-            {/* Active Workspace */}
-            {activeWorkspace && (
+            {/* Selected Workspace */}
+            {selectedWorkspace && (
               <div className="p-4 bg-bg-secondary rounded-2xl border border-accent/30">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <FolderIcon isActive={true} />
                     <div>
                       <span className="font-semibold text-text-primary">
-                        {activeWorkspace.name}
+                        {selectedWorkspace.name}
                       </span>
                       <p className="text-sm text-text-secondary">
                         <span className="text-success">{gitStatus?.branch || 'main'}</span>
                         {gitStatus && (
-                          <span className="ml-1">• {getGitStatusText(gitStatus)}</span>
+                          <span className="ml-1">{getGitStatusText(gitStatus)}</span>
                         )}
                       </p>
                     </div>
                   </div>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="w-5 h-5 text-accent"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z"
-                      clipRule="evenodd"
-                    />
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-accent">
+                    <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clipRule="evenodd" />
                   </svg>
                 </div>
-                <p className="text-xs text-text-muted mb-4 truncate">{activeWorkspace.path}</p>
+                <p className="text-xs text-text-muted mb-4 truncate">{selectedWorkspace.path}</p>
 
                 {/* Quick Actions Button */}
                 <button
                   onClick={() => setShowQuickActions(true)}
                   className="w-full flex items-center justify-center gap-2 py-2.5 bg-accent/10 text-accent rounded-xl text-sm font-medium hover:bg-accent/20 transition-colors"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="w-4 h-4"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z"
-                      clipRule="evenodd"
-                    />
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                    <path fillRule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clipRule="evenodd" />
                   </svg>
                   Quick Actions
                 </button>
@@ -197,7 +172,7 @@ export function ReposPage() {
 
             {/* Other Workspaces */}
             {workspaceList
-              .filter((w) => w.id !== activeWorkspace?.id)
+              .filter((w) => w.id !== selectedWorkspaceId)
               .map((workspace) => (
                 <button
                   key={workspace.id}
@@ -221,26 +196,16 @@ export function ReposPage() {
         )}
       </main>
 
-      {/* Bottom Navigation */}
-      <BottomNav />
-
       {/* Add Workspace Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setShowAddModal(false)}
-          />
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowAddModal(false)} />
           <div className="relative bg-bg-elevated rounded-2xl p-6 mx-4 w-full max-w-md">
-            <h2 className="text-lg font-semibold text-text-primary mb-4">
-              Add Workspace
-            </h2>
+            <h2 className="text-lg font-semibold text-text-primary mb-4">Add Workspace</h2>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Path *
-                </label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">Path *</label>
                 <input
                   type="text"
                   value={newWorkspacePath}
@@ -249,11 +214,8 @@ export function ReposPage() {
                   className="w-full px-4 py-2.5 bg-bg-surface border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Name (optional)
-                </label>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">Name (optional)</label>
                 <input
                   type="text"
                   value={newWorkspaceName}
@@ -261,9 +223,7 @@ export function ReposPage() {
                   placeholder="my-repo"
                   className="w-full px-4 py-2.5 bg-bg-surface border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
                 />
-                <p className="mt-1 text-xs text-text-muted">
-                  If empty, will use folder name
-                </p>
+                <p className="mt-1 text-xs text-text-muted">If empty, will use folder name</p>
               </div>
             </div>
 
@@ -288,6 +248,6 @@ export function ReposPage() {
 
       {/* Quick Actions Panel */}
       <QuickActions isOpen={showQuickActions} onClose={() => setShowQuickActions(false)} />
-    </div>
+    </AppLayout>
   );
 }

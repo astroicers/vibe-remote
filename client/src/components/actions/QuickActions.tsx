@@ -14,7 +14,8 @@ interface QuickActionsProps {
 export function QuickActions({ isOpen, onClose }: QuickActionsProps) {
   const navigate = useNavigate();
   const {
-    gitStatus,
+    selectedWorkspaceId,
+    gitStateByWorkspace,
     isLoading,
     error,
     loadGitStatus,
@@ -25,6 +26,9 @@ export function QuickActions({ isOpen, onClose }: QuickActionsProps) {
     clearError,
   } = useWorkspaceStore();
 
+  const wsId = selectedWorkspaceId || '';
+  const gitStatus = wsId ? gitStateByWorkspace[wsId]?.gitStatus ?? null : null;
+
   const [commitMessage, setCommitMessage] = useState('');
   const [showCommitInput, setShowCommitInput] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -32,20 +36,21 @@ export function QuickActions({ isOpen, onClose }: QuickActionsProps) {
   if (!isOpen) return null;
 
   const handleStageAll = async () => {
+    if (!wsId) return;
     setActionLoading('stage');
     try {
-      await stageFiles(['.']);
+      await stageFiles(wsId, ['.']);
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleCommit = async () => {
-    if (!commitMessage.trim()) return;
+    if (!commitMessage.trim() || !wsId) return;
 
     setActionLoading('commit');
     try {
-      await commit(commitMessage.trim());
+      await commit(wsId, commitMessage.trim());
       setCommitMessage('');
       setShowCommitInput(false);
     } finally {
@@ -54,18 +59,20 @@ export function QuickActions({ isOpen, onClose }: QuickActionsProps) {
   };
 
   const handlePush = async () => {
+    if (!wsId) return;
     setActionLoading('push');
     try {
-      await push();
+      await push(wsId);
     } finally {
       setActionLoading(null);
     }
   };
 
   const handlePull = async () => {
+    if (!wsId) return;
     setActionLoading('pull');
     try {
-      await pull();
+      await pull(wsId);
     } finally {
       setActionLoading(null);
     }
@@ -115,17 +122,8 @@ export function QuickActions({ isOpen, onClose }: QuickActionsProps) {
           <div className="mx-5 mb-4 p-3 bg-danger/20 rounded-xl flex items-center justify-between">
             <span className="text-sm text-danger">{error}</span>
             <button onClick={clearError} className="text-danger hover:text-danger/80">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="w-4 h-4"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z"
-                  clipRule="evenodd"
-                />
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
               </svg>
             </button>
           </div>
@@ -136,7 +134,7 @@ export function QuickActions({ isOpen, onClose }: QuickActionsProps) {
           {/* Git Status */}
           <GitStatusCard
             status={gitStatus}
-            onRefresh={loadGitStatus}
+            onRefresh={() => wsId && loadGitStatus(wsId)}
             isLoading={isLoading}
           />
 
@@ -179,17 +177,8 @@ export function QuickActions({ isOpen, onClose }: QuickActionsProps) {
             {hasUnstagedChanges && (
               <ActionButton
                 icon={
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="w-5 h-5"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M12 3.75a.75.75 0 0 1 .75.75v6.75h6.75a.75.75 0 0 1 0 1.5h-6.75v6.75a.75.75 0 0 1-1.5 0v-6.75H4.5a.75.75 0 0 1 0-1.5h6.75V4.5a.75.75 0 0 1 .75-.75Z"
-                      clipRule="evenodd"
-                    />
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                    <path fillRule="evenodd" d="M12 3.75a.75.75 0 0 1 .75.75v6.75h6.75a.75.75 0 0 1 0 1.5h-6.75v6.75a.75.75 0 0 1-1.5 0v-6.75H4.5a.75.75 0 0 1 0-1.5h6.75V4.5a.75.75 0 0 1 .75-.75Z" clipRule="evenodd" />
                   </svg>
                 }
                 label="Stage All Changes"
@@ -203,17 +192,8 @@ export function QuickActions({ isOpen, onClose }: QuickActionsProps) {
             {hasStagedChanges && !showCommitInput && (
               <ActionButton
                 icon={
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="w-5 h-5"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z"
-                      clipRule="evenodd"
-                    />
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                    <path fillRule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
                   </svg>
                 }
                 label="Commit Changes"
@@ -226,17 +206,8 @@ export function QuickActions({ isOpen, onClose }: QuickActionsProps) {
             {canPush && (
               <ActionButton
                 icon={
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="w-5 h-5"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M11.47 2.47a.75.75 0 0 1 1.06 0l7.5 7.5a.75.75 0 1 1-1.06 1.06l-6.22-6.22V21a.75.75 0 0 1-1.5 0V4.81l-6.22 6.22a.75.75 0 1 1-1.06-1.06l7.5-7.5Z"
-                      clipRule="evenodd"
-                    />
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                    <path fillRule="evenodd" d="M11.47 2.47a.75.75 0 0 1 1.06 0l7.5 7.5a.75.75 0 1 1-1.06 1.06l-6.22-6.22V21a.75.75 0 0 1-1.5 0V4.81l-6.22 6.22a.75.75 0 1 1-1.06-1.06l7.5-7.5Z" clipRule="evenodd" />
                   </svg>
                 }
                 label="Push to Remote"
@@ -249,17 +220,8 @@ export function QuickActions({ isOpen, onClose }: QuickActionsProps) {
             {shouldPull && (
               <ActionButton
                 icon={
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="w-5 h-5"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M12.53 21.53a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 1 1 1.06-1.06l6.22 6.22V3a.75.75 0 0 1 1.5 0v16.19l6.22-6.22a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z"
-                      clipRule="evenodd"
-                    />
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                    <path fillRule="evenodd" d="M12.53 21.53a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 1 1 1.06-1.06l6.22 6.22V3a.75.75 0 0 1 1.5 0v16.19l6.22-6.22a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z" clipRule="evenodd" />
                   </svg>
                 }
                 label="Pull from Remote"
@@ -274,17 +236,8 @@ export function QuickActions({ isOpen, onClose }: QuickActionsProps) {
             {!shouldPull && (
               <ActionButton
                 icon={
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="w-5 h-5"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M12.53 21.53a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 1 1 1.06-1.06l6.22 6.22V3a.75.75 0 0 1 1.5 0v16.19l6.22-6.22a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z"
-                      clipRule="evenodd"
-                    />
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                    <path fillRule="evenodd" d="M12.53 21.53a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 1 1 1.06-1.06l6.22 6.22V3a.75.75 0 0 1 1.5 0v16.19l6.22-6.22a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z" clipRule="evenodd" />
                   </svg>
                 }
                 label="Pull Latest"
@@ -303,17 +256,8 @@ export function QuickActions({ isOpen, onClose }: QuickActionsProps) {
 
             <ActionButton
               icon={
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="w-5 h-5"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z"
-                    clipRule="evenodd"
-                  />
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                  <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z" clipRule="evenodd" />
                   <path d="M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z" />
                 </svg>
               }
@@ -327,17 +271,8 @@ export function QuickActions({ isOpen, onClose }: QuickActionsProps) {
 
             <ActionButton
               icon={
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="w-5 h-5"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M2.25 5.25a3 3 0 0 1 3-3h13.5a3 3 0 0 1 3 3v13.5a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V5.25Zm3.75.75a.75.75 0 0 0 0 1.5h1.5a.75.75 0 0 0 0-1.5H6Zm3 0a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5ZM6 9.75a.75.75 0 0 0 0 1.5h1.5a.75.75 0 0 0 0-1.5H6Zm3 0a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5ZM6 13.5a.75.75 0 0 0 0 1.5h1.5a.75.75 0 0 0 0-1.5H6Zm3 0a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5Z"
-                    clipRule="evenodd"
-                  />
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                  <path fillRule="evenodd" d="M2.25 5.25a3 3 0 0 1 3-3h13.5a3 3 0 0 1 3 3v13.5a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V5.25Zm3.75.75a.75.75 0 0 0 0 1.5h1.5a.75.75 0 0 0 0-1.5H6Zm3 0a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5ZM6 9.75a.75.75 0 0 0 0 1.5h1.5a.75.75 0 0 0 0-1.5H6Zm3 0a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5ZM6 13.5a.75.75 0 0 0 0 1.5h1.5a.75.75 0 0 0 0-1.5H6Zm3 0a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5Z" clipRule="evenodd" />
                 </svg>
               }
               label="Workspaces"

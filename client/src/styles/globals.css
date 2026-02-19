@@ -75,6 +75,16 @@
   .safe-bottom {
     padding-bottom: var(--safe-area-bottom);
   }
+
+  /* Full-height layout that respects safe areas (notch, Dynamic Island, home indicator) */
+  .app-shell {
+    height: 100vh;
+    height: 100dvh; /* dynamic viewport height — excludes virtual keyboard on iOS */
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    display: flex;
+    flex-direction: column;
+  }
 }
 
 @layer components {
@@ -137,11 +147,12 @@
            min-h-[48px] transition-all duration-200;
   }
 
-  /* Bottom navigation */
+  /* Bottom navigation — safe-bottom handled by app-shell container */
   .bottom-nav {
-    @apply fixed bottom-0 left-0 right-0 bg-bg-secondary border-t border-border
-           flex justify-around items-center safe-bottom;
-    height: calc(64px + var(--safe-area-bottom));
+    @apply bg-bg-secondary border-t border-border
+           flex justify-around items-center;
+    height: 56px;
+    flex-shrink: 0;
   }
 
   .nav-item {
@@ -172,9 +183,37 @@
     @apply w-12 h-1 bg-border rounded-full mx-auto mb-4;
   }
 
-  /* Header */
+  /* Header — safe-top handled by app-shell container */
   .header {
-    @apply fixed top-0 left-0 right-0 h-14 bg-black/80 backdrop-blur-xl
-           border-b border-border px-4 flex items-center safe-top z-50;
+    @apply h-14 bg-black/80 backdrop-blur-xl
+           border-b border-border px-4 flex items-center z-50;
+    flex-shrink: 0;
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Slide up animation for panels */
+  @keyframes slide-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out;
+  }
+
+  /* Slide down animation for toasts */
+  @keyframes slide-down {
+    from { transform: translateY(-100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .animate-slide-down {
+    animation: slide-down 0.3s ease-out;
   }
 }

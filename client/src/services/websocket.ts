@@ -18,13 +18,22 @@ class WebSocketService {
   private pendingMessages: WSMessage[] = [];
 
   constructor() {
+    // Always use same host — Vite proxy handles /ws → server in dev
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     this.url = `${protocol}//${window.location.host}/ws`;
   }
 
   connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
       return;
+    }
+
+    // Clean up old connection
+    if (this.ws) {
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.onmessage = null;
+      this.ws.onopen = null;
     }
 
     this.ws = new WebSocket(this.url);
@@ -100,9 +109,9 @@ class WebSocketService {
 
   send(message: WSMessage): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn('WebSocket not connected, queueing message');
-      this.pendingMessages.push(message);
-      this.connect();
+      if (this.pendingMessages.length < 50) {
+        this.pendingMessages.push(message);
+      }
       return;
     }
 
@@ -153,11 +162,13 @@ export const ws = new WebSocketService();
 // Chat-specific helpers
 export function sendChatMessage(
   message: string,
+  workspaceId: string,
   conversationId?: string,
   selectedFiles?: string[]
 ): void {
   ws.send({
     type: 'chat_send',
+    workspaceId,
     message,
     conversationId,
     selectedFiles,

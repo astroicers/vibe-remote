@@ -1,8 +1,9 @@
-// Chat Store
+// Chat Store - Per-workspace partitioned state
 
 import { create } from 'zustand';
 import { chat, type Conversation, type Message } from '../services/api';
 import { ws, sendChatMessage } from '../services/websocket';
+import { useWorkspaceStore } from './workspace';
 
 export interface TokenUsage {
   inputTokens: number;
@@ -27,62 +28,102 @@ interface ChatMessage extends Message {
   tokenUsage?: TokenUsage;
 }
 
-interface ChatState {
+interface WorkspaceChatState {
   conversations: Conversation[];
-  currentConversation: Conversation | null;
+  currentConversationId: string | null;
   messages: ChatMessage[];
-  isLoading: boolean;
-  isSending: boolean;
-  error: string | null;
-
-  // Streaming state
   streamingMessage: string;
   isStreaming: boolean;
-
-  // Token usage from last completed message
+  isSending: boolean;
   lastTokenUsage: TokenUsage | null;
   showTokenUsage: boolean;
-
-  // Tool approval
   pendingApprovals: PendingToolApproval[];
+  unreadCount: number;
+}
 
-  // Actions
-  loadConversations: () => Promise<void>;
-  loadConversation: (id: string) => Promise<void>;
-  createConversation: () => Promise<string>;
-  sendMessage: (content: string, selectedFiles?: string[]) => void;
-  retryConversation: (conversationId: string) => void;
+function createDefaultWorkspaceChatState(): WorkspaceChatState {
+  return {
+    conversations: [],
+    currentConversationId: null,
+    messages: [],
+    streamingMessage: '',
+    isStreaming: false,
+    isSending: false,
+    lastTokenUsage: null,
+    showTokenUsage: false,
+    pendingApprovals: [],
+    unreadCount: 0,
+  };
+}
+
+interface ChatState {
+  workspaceChats: Record<string, WorkspaceChatState>;
+  error: string | null;
+
+  getWorkspaceChat: (workspaceId: string) => WorkspaceChatState;
+
+  // All actions take workspaceId
+  loadConversations: (workspaceId: string) => Promise<void>;
+  loadConversation: (workspaceId: string, conversationId: string) => Promise<void>;
+  createConversation: (workspaceId: string) => Promise<string>;
+  selectConversation: (workspaceId: string, conversationId: string) => void;
+  sendMessage: (workspaceId: string, content: string, selectedFiles?: string[]) => void;
+  retryConversation: (workspaceId: string, conversationId: string) => void;
+
+  incrementUnread: (workspaceId: string) => void;
+  clearUnread: (workspaceId: string) => void;
+
   clearError: () => void;
-  dismissTokenUsage: () => void;
+  dismissTokenUsage: (workspaceId: string) => void;
   approveToolUse: (toolId: string) => void;
   rejectToolUse: (toolId: string, reason?: string) => void;
+}
+
+function updateWorkspaceChat(
+  state: ChatState,
+  workspaceId: string,
+  updater: (chat: WorkspaceChatState) => Partial<WorkspaceChatState>
+): Partial<ChatState> {
+  const current = state.workspaceChats[workspaceId] || createDefaultWorkspaceChatState();
+  return {
+    workspaceChats: {
+      ...state.workspaceChats,
+      [workspaceId]: { ...current, ...updater(current) },
+    },
+  };
 }
 
 export const useChatStore = create<ChatState>((set, get) => {
   // Setup WebSocket handlers
   const setupWSHandlers = () => {
     ws.on('conversation_created', (data) => {
+      const workspaceId = data.workspaceId as string;
       const conversationId = data.conversationId as string;
-      set((state) => ({
-        currentConversation: state.currentConversation || {
-          id: conversationId,
-          workspace_id: '',
-          title: 'New Conversation',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      }));
+      set((state) =>
+        updateWorkspaceChat(state, workspaceId, (chat) => ({
+          currentConversationId: chat.currentConversationId || conversationId,
+        }))
+      );
     });
 
-    ws.on('chat_start', () => {
-      set({ isStreaming: true, streamingMessage: '' });
+    ws.on('chat_start', (data) => {
+      const workspaceId = data.workspaceId as string;
+      set((state) =>
+        updateWorkspaceChat(state, workspaceId, () => ({
+          isStreaming: true,
+          streamingMessage: '',
+        }))
+      );
     });
 
     ws.on('chat_chunk', (data) => {
+      const workspaceId = data.workspaceId as string;
       const text = data.text as string;
-      set((state) => ({
-        streamingMessage: state.streamingMessage + text,
-      }));
+      set((state) =>
+        updateWorkspaceChat(state, workspaceId, (chat) => ({
+          streamingMessage: chat.streamingMessage + text,
+        }))
+      );
     });
 
     ws.on('tool_use', (data) => {
@@ -94,37 +135,49 @@ export const useChatStore = create<ChatState>((set, get) => {
     });
 
     ws.on('chat_complete', (data) => {
-      const { streamingMessage } = get();
+      const workspaceId = data.workspaceId as string;
       const tokenUsage = data.tokenUsage as TokenUsage | undefined;
 
-      // Add completed message to messages
-      const newMessage: ChatMessage = {
-        id: `msg_${Date.now()}`,
-        role: 'assistant',
-        content: streamingMessage,
-        created_at: new Date().toISOString(),
-        tokenUsage,
-      };
+      set((state) => {
+        const wsChat = state.workspaceChats[workspaceId] || createDefaultWorkspaceChatState();
+        const newMessage: ChatMessage = {
+          id: `msg_${Date.now()}`,
+          role: 'assistant',
+          content: wsChat.streamingMessage,
+          created_at: new Date().toISOString(),
+          tokenUsage,
+        };
+        return updateWorkspaceChat(state, workspaceId, () => ({
+          messages: [...wsChat.messages, newMessage],
+          streamingMessage: '',
+          isStreaming: false,
+          isSending: false,
+          lastTokenUsage: tokenUsage || null,
+          showTokenUsage: !!tokenUsage,
+        }));
+      });
 
-      set((state) => ({
-        messages: [...state.messages, newMessage],
-        streamingMessage: '',
-        isStreaming: false,
-        isSending: false,
-        lastTokenUsage: tokenUsage || null,
-        showTokenUsage: !!tokenUsage,
-      }));
+      // Check if background workspace — cross-store access
+      const selectedWsId = useWorkspaceStore.getState().selectedWorkspaceId;
+      if (workspaceId !== selectedWsId) {
+        get().incrementUnread(workspaceId);
+      }
 
-      // Refresh conversations list
-      get().loadConversations();
+      // Refresh conversations list for this workspace
+      get().loadConversations(workspaceId);
     });
 
     ws.on('chat_error', (data) => {
-      set({
-        error: data.error as string,
-        isStreaming: false,
-        isSending: false,
-      });
+      const workspaceId = data.workspaceId as string;
+      if (workspaceId) {
+        set((state) =>
+          updateWorkspaceChat(state, workspaceId, () => ({
+            isStreaming: false,
+            isSending: false,
+          }))
+        );
+      }
+      set({ error: data.error as string });
     });
 
     ws.on('diff_ready', (data) => {
@@ -141,16 +194,33 @@ export const useChatStore = create<ChatState>((set, get) => {
         description: data.description as string,
         risk: data.risk as 'low' | 'medium' | 'high',
       };
-      set((state) => ({
-        pendingApprovals: [...state.pendingApprovals, approval],
-      }));
+      // Tool approvals are per-device, not workspace-scoped
+      // Add to all workspace chats that are currently streaming, or to the selected workspace
+      const selectedWsId = useWorkspaceStore.getState().selectedWorkspaceId;
+      if (selectedWsId) {
+        set((state) =>
+          updateWorkspaceChat(state, selectedWsId, (chat) => ({
+            pendingApprovals: [...chat.pendingApprovals, approval],
+          }))
+        );
+      }
     });
 
     ws.on('tool_approval_confirmed', (data) => {
       const toolId = data.toolId as string;
-      set((state) => ({
-        pendingApprovals: state.pendingApprovals.filter((a) => a.toolId !== toolId),
-      }));
+      // Remove from all workspace chats
+      set((state) => {
+        const updated: Record<string, WorkspaceChatState> = {};
+        for (const [wsId, wsChat] of Object.entries(state.workspaceChats)) {
+          const filtered = wsChat.pendingApprovals.filter((a) => a.toolId !== toolId);
+          if (filtered.length !== wsChat.pendingApprovals.length) {
+            updated[wsId] = { ...wsChat, pendingApprovals: filtered };
+          } else {
+            updated[wsId] = wsChat;
+          }
+        }
+        return { workspaceChats: updated };
+      });
     });
   };
 
@@ -158,88 +228,111 @@ export const useChatStore = create<ChatState>((set, get) => {
   setupWSHandlers();
 
   return {
-    conversations: [],
-    currentConversation: null,
-    messages: [],
-    isLoading: false,
-    isSending: false,
+    workspaceChats: {},
     error: null,
-    streamingMessage: '',
-    isStreaming: false,
-    lastTokenUsage: null,
-    showTokenUsage: false,
-    pendingApprovals: [],
 
-    loadConversations: async () => {
-      set({ isLoading: true, error: null });
+    getWorkspaceChat: (workspaceId: string) => {
+      return get().workspaceChats[workspaceId] || createDefaultWorkspaceChatState();
+    },
+
+    loadConversations: async (workspaceId: string) => {
       try {
-        const conversations = await chat.listConversations();
-        set({ conversations, isLoading: false });
+        const conversations = await chat.listConversations(workspaceId);
+        set((state) => updateWorkspaceChat(state, workspaceId, () => ({ conversations })));
       } catch (error) {
-        set({
-          isLoading: false,
-          error: error instanceof Error ? error.message : 'Failed to load conversations',
-        });
+        set({ error: error instanceof Error ? error.message : 'Failed to load conversations' });
       }
     },
 
-    loadConversation: async (id: string) => {
-      set({ isLoading: true, error: null });
+    loadConversation: async (workspaceId: string, conversationId: string) => {
       try {
-        const data = await chat.getConversation(id);
-        set({
-          currentConversation: data,
-          messages: data.messages,
-          isLoading: false,
-        });
+        const data = await chat.getConversation(conversationId);
+        set((state) =>
+          updateWorkspaceChat(state, workspaceId, () => ({
+            currentConversationId: conversationId,
+            messages: data.messages,
+          }))
+        );
       } catch (error) {
-        set({
-          isLoading: false,
-          error: error instanceof Error ? error.message : 'Failed to load conversation',
-        });
+        set({ error: error instanceof Error ? error.message : 'Failed to load conversation' });
       }
     },
 
-    createConversation: async () => {
-      const conversation = await chat.createConversation({});
-      set({
-        currentConversation: conversation,
-        messages: [],
-      });
+    createConversation: async (workspaceId: string) => {
+      const conversation = await chat.createConversation({ workspaceId });
+      set((state) =>
+        updateWorkspaceChat(state, workspaceId, () => ({
+          currentConversationId: conversation.id,
+          messages: [],
+        }))
+      );
       return conversation.id;
     },
 
-    sendMessage: (content: string, selectedFiles?: string[]) => {
-      const { currentConversation } = get();
+    selectConversation: (workspaceId: string, conversationId: string) => {
+      set((state) =>
+        updateWorkspaceChat(state, workspaceId, () => ({
+          currentConversationId: conversationId,
+        }))
+      );
+    },
 
-      // Add user message to UI immediately
+    sendMessage: (workspaceId: string, content: string, selectedFiles?: string[]) => {
+      const wsChat = get().getWorkspaceChat(workspaceId);
       const userMessage: ChatMessage = {
         id: `msg_${Date.now()}`,
         role: 'user',
         content,
         created_at: new Date().toISOString(),
       };
+      set((state) =>
+        updateWorkspaceChat(state, workspaceId, (chat) => ({
+          messages: [...chat.messages, userMessage],
+          isSending: true,
+        }))
+      );
+      set({ error: null });
+      sendChatMessage(content, workspaceId, wsChat.currentConversationId || undefined, selectedFiles);
+    },
 
-      set((state) => ({
-        messages: [...state.messages, userMessage],
-        isSending: true,
-        error: null,
-      }));
+    retryConversation: (workspaceId: string, conversationId: string) => {
+      set((state) =>
+        updateWorkspaceChat(state, workspaceId, () => ({
+          isSending: true,
+        }))
+      );
+      set({ error: null });
+      ws.send({
+        type: 'chat_retry',
+        workspaceId,
+        conversationId,
+      });
+    },
 
-      // Send via WebSocket
-      sendChatMessage(content, currentConversation?.id, selectedFiles);
+    incrementUnread: (workspaceId: string) => {
+      set((state) =>
+        updateWorkspaceChat(state, workspaceId, (chat) => ({
+          unreadCount: chat.unreadCount + 1,
+        }))
+      );
+    },
+
+    clearUnread: (workspaceId: string) => {
+      set((state) =>
+        updateWorkspaceChat(state, workspaceId, () => ({
+          unreadCount: 0,
+        }))
+      );
     },
 
     clearError: () => set({ error: null }),
 
-    dismissTokenUsage: () => set({ showTokenUsage: false }),
-
-    retryConversation: (conversationId: string) => {
-      set({ isSending: true, error: null });
-      ws.send({
-        type: 'chat_retry',
-        conversationId,
-      });
+    dismissTokenUsage: (workspaceId: string) => {
+      set((state) =>
+        updateWorkspaceChat(state, workspaceId, () => ({
+          showTokenUsage: false,
+        }))
+      );
     },
 
     approveToolUse: (toolId: string) => {
@@ -248,10 +341,17 @@ export const useChatStore = create<ChatState>((set, get) => {
         toolId,
         approved: true,
       });
-      // Optimistically remove from pending
-      set((state) => ({
-        pendingApprovals: state.pendingApprovals.filter((a) => a.toolId !== toolId),
-      }));
+      // Optimistically remove from all workspace chats
+      set((state) => {
+        const updated: Record<string, WorkspaceChatState> = {};
+        for (const [wsId, wsChat] of Object.entries(state.workspaceChats)) {
+          updated[wsId] = {
+            ...wsChat,
+            pendingApprovals: wsChat.pendingApprovals.filter((a) => a.toolId !== toolId),
+          };
+        }
+        return { workspaceChats: updated };
+      });
     },
 
     rejectToolUse: (toolId: string, reason?: string) => {
@@ -261,10 +361,17 @@ export const useChatStore = create<ChatState>((set, get) => {
         approved: false,
         reason,
       });
-      // Optimistically remove from pending
-      set((state) => ({
-        pendingApprovals: state.pendingApprovals.filter((a) => a.toolId !== toolId),
-      }));
+      // Optimistically remove from all workspace chats
+      set((state) => {
+        const updated: Record<string, WorkspaceChatState> = {};
+        for (const [wsId, wsChat] of Object.entries(state.workspaceChats)) {
+          updated[wsId] = {
+            ...wsChat,
+            pendingApprovals: wsChat.pendingApprovals.filter((a) => a.toolId !== toolId),
+          };
+        }
+        return { workspaceChats: updated };
+      });
     },
   };
 });

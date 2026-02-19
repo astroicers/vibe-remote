@@ -75,7 +75,6 @@ export interface Workspace {
   id: string;
   name: string;
   path: string;
-  isActive: boolean;
   systemPrompt: string | null;
   createdAt: string;
 }
@@ -85,13 +84,8 @@ export const workspaces = {
 
   get: (id: string) => request<Workspace>(`/workspaces/${id}`),
 
-  getActive: () => request<Workspace>('/workspaces/active'),
-
-  register: (data: { path: string; name?: string; setActive?: boolean }) =>
+  register: (data: { path: string; name?: string }) =>
     request<Workspace>('/workspaces', { method: 'POST', json: data }),
-
-  setActive: (id: string) =>
-    request<Workspace>(`/workspaces/${id}/activate`, { method: 'POST' }),
 
   getFiles: (id: string, depth = 3) =>
     request<FileNode>(`/workspaces/${id}/files?depth=${depth}`),
@@ -192,13 +186,13 @@ export interface Message {
 }
 
 export const chat = {
-  listConversations: () =>
-    request<Conversation[]>('/chat/conversations'),
+  listConversations: (workspaceId: string) =>
+    request<Conversation[]>(`/chat/conversations?workspaceId=${workspaceId}`),
 
   getConversation: (id: string) =>
     request<Conversation & { messages: Message[] }>(`/chat/conversations/${id}`),
 
-  createConversation: (data: { title?: string; workspaceId?: string }) =>
+  createConversation: (data: { title?: string; workspaceId: string }) =>
     request<Conversation>('/chat/conversations', { method: 'POST', json: data }),
 
   updateConversation: (id: string, title: string) =>
@@ -262,16 +256,18 @@ export interface DiffReview {
 }
 
 export const diff = {
-  getCurrent: () => request<DiffSummary & { workspaceId: string }>('/diff/current'),
+  getCurrent: (workspaceId: string) =>
+    request<DiffSummary & { workspaceId: string }>(`/diff/current?workspaceId=${workspaceId}`),
 
-  listReviews: () => request<DiffReview[]>('/diff/reviews'),
+  listReviews: (workspaceId: string) =>
+    request<DiffReview[]>(`/diff/reviews?workspaceId=${workspaceId}`),
 
   getReview: (id: string) => request<DiffReview>(`/diff/reviews/${id}`),
 
-  createReview: (conversationId?: string) =>
+  createReview: (workspaceId: string, conversationId?: string) =>
     request<DiffReview>('/diff/reviews', {
       method: 'POST',
-      json: { conversationId },
+      json: { workspaceId, conversationId },
     }),
 
   approveAll: (id: string) =>

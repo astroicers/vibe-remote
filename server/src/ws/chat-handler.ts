@@ -4,7 +4,7 @@ import type { WebSocket } from 'ws';
 import { z } from 'zod';
 import { verifyToken } from '../auth/jwt.js';
 import { getDb, generateId } from '../db/index.js';
-import { getActiveWorkspace, getWorkspace } from '../workspace/index.js';
+import { getWorkspace } from '../workspace/index.js';
 import { ClaudeSdkRunner, StreamEvent } from '../ai/claude-sdk.js';
 import {
   getConversationHistory,
@@ -23,6 +23,7 @@ import {
 // Message schemas
 const chatMessageSchema = z.object({
   type: z.literal('chat_send'),
+  workspaceId: z.string(),
   conversationId: z.string().optional(),
   message: z.string().min(1),
   selectedFiles: z.array(z.string()).optional(),
@@ -80,9 +81,19 @@ function send(ws: WebSocket, data: Record<string, unknown>): void {
   }
 }
 
+interface RunnerState {
+  runner: ClaudeSdkRunner;
+  workspaceId: string;
+  conversationId: string;
+}
+const activeRunners = new Map<string, RunnerState>();
+const MAX_CONCURRENT_RUNNERS = 3;
+
+function runnerKey(workspaceId: string, conversationId: string): string {
+  return `${workspaceId}:${conversationId}`;
+}
+
 export function handleChatWebSocket(ws: AuthenticatedSocket): void {
-  let isProcessing = false;
-  let currentRunner: ClaudeSdkRunner | null = null;
 
   ws.on('message', async (data) => {
     let parsed: unknown;
@@ -134,34 +145,38 @@ export function handleChatWebSocket(ws: AuthenticatedSocket): void {
     if (chatParsed.success) {
       // Check rate limit
       if (!checkRateLimit(ws.deviceId!)) {
-        send(ws, {
-          type: 'error',
-          error: 'Rate limit exceeded. Please wait before sending more messages.',
-        });
+        send(ws, { type: 'error', error: 'Rate limit exceeded.' });
         return;
       }
 
-      // Check if already processing
-      if (isProcessing) {
-        send(ws, {
-          type: 'error',
-          error: 'Already processing a message. Please wait.',
-        });
-        return;
+      const workspaceId = chatParsed.data.workspaceId;
+      const conversationId = chatParsed.data.conversationId;
+
+      // Check per-conversation lock
+      if (conversationId) {
+        const key = runnerKey(workspaceId, conversationId);
+        if (activeRunners.has(key)) {
+          send(ws, { type: 'error', error: 'This conversation is already processing.' });
+          return;
+        }
       }
 
-      isProcessing = true;
+      // Check global concurrency limit
+      if (activeRunners.size >= MAX_CONCURRENT_RUNNERS) {
+        send(ws, { type: 'error', error: 'Too many concurrent sessions. Please wait.' });
+        return;
+      }
 
       try {
-        currentRunner = await handleChatMessage(ws, chatParsed.data);
+        await handleChatMessage(ws, chatParsed.data, activeRunners);
+        // Runner is cleaned up inside handleChatMessage
       } catch (error) {
         send(ws, {
           type: 'chat_error',
+          workspaceId,
+          conversationId,
           error: error instanceof Error ? error.message : 'Chat failed',
         });
-      } finally {
-        isProcessing = false;
-        currentRunner = null;
       }
 
       return;
@@ -179,27 +194,42 @@ export function handleChatWebSocket(ws: AuthenticatedSocket): void {
         return;
       }
 
-      // Check if already processing
-      if (isProcessing) {
-        send(ws, {
-          type: 'error',
-          error: 'Already processing a message. Please wait.',
-        });
+      // Look up workspace from conversation
+      const db = getDb();
+      const retryConv = db
+        .prepare('SELECT workspace_id FROM conversations WHERE id = ?')
+        .get(retryParsed.data.conversationId) as { workspace_id: string } | undefined;
+
+      if (!retryConv) {
+        send(ws, { type: 'chat_error', error: 'Conversation not found' });
         return;
       }
 
-      isProcessing = true;
+      const retryWorkspaceId = retryConv.workspace_id;
+
+      // Check per-conversation lock
+      const retryKey = runnerKey(retryWorkspaceId, retryParsed.data.conversationId);
+      if (activeRunners.has(retryKey)) {
+        send(ws, { type: 'error', error: 'This conversation is already processing.' });
+        return;
+      }
+
+      // Check global concurrency limit
+      if (activeRunners.size >= MAX_CONCURRENT_RUNNERS) {
+        send(ws, { type: 'error', error: 'Too many concurrent sessions. Please wait.' });
+        return;
+      }
 
       try {
-        currentRunner = await handleRetryMessage(ws, retryParsed.data.conversationId);
+        await handleRetryMessage(ws, retryParsed.data.conversationId, activeRunners);
+        // Runner is cleaned up inside handleRetryMessage -> handleChatMessage
       } catch (error) {
         send(ws, {
           type: 'chat_error',
+          workspaceId: retryWorkspaceId,
+          conversationId: retryParsed.data.conversationId,
           error: error instanceof Error ? error.message : 'Retry failed',
         });
-      } finally {
-        isProcessing = false;
-        currentRunner = null;
       }
 
       return;
@@ -240,10 +270,11 @@ export function handleChatWebSocket(ws: AuthenticatedSocket): void {
   });
 
   ws.on('close', () => {
-    // Abort any running Claude SDK query
-    if (currentRunner) {
-      currentRunner.abort();
+    // Abort all running Claude SDK queries
+    for (const [_key, state] of activeRunners) {
+      state.runner.abort();
     }
+    activeRunners.clear();
 
     // Cancel any pending tool approvals for this device
     if (ws.deviceId) {
@@ -256,28 +287,31 @@ export function handleChatWebSocket(ws: AuthenticatedSocket): void {
 
   ws.on('error', (error) => {
     console.error('WebSocket error:', error);
-    if (currentRunner) {
-      currentRunner.abort();
+    for (const [_key, state] of activeRunners) {
+      state.runner.abort();
     }
+    activeRunners.clear();
   });
 }
 
 async function handleChatMessage(
   ws: AuthenticatedSocket,
-  data: z.infer<typeof chatMessageSchema>
+  data: z.infer<typeof chatMessageSchema>,
+  runners: Map<string, RunnerState>
 ): Promise<ClaudeSdkRunner> {
   const db = getDb();
+  const workspaceId = data.workspaceId;
 
   // Get or create conversation
   let conversationId = data.conversationId;
   let isNewConversation = false;
 
   if (!conversationId) {
-    // Get active workspace
-    const workspace = getActiveWorkspace();
+    // Validate workspace exists
+    const workspace = getWorkspace(workspaceId);
     if (!workspace) {
-      send(ws, { type: 'chat_error', error: 'No active workspace' });
-      throw new Error('No active workspace');
+      send(ws, { type: 'chat_error', workspaceId, error: 'Workspace not found' });
+      throw new Error('Workspace not found');
     }
 
     // Create new conversation
@@ -293,6 +327,7 @@ async function handleChatMessage(
 
     send(ws, {
       type: 'conversation_created',
+      workspaceId,
       conversationId,
     });
   }
@@ -303,13 +338,13 @@ async function handleChatMessage(
     .get(conversationId) as { workspace_id: string; sdk_session_id: string | null } | undefined;
 
   if (!conversation) {
-    send(ws, { type: 'chat_error', error: 'Conversation not found' });
+    send(ws, { type: 'chat_error', workspaceId, conversationId, error: 'Conversation not found' });
     throw new Error('Conversation not found');
   }
 
   const workspace = getWorkspace(conversation.workspace_id);
   if (!workspace) {
-    send(ws, { type: 'chat_error', error: 'Workspace not found' });
+    send(ws, { type: 'chat_error', workspaceId, conversationId, error: 'Workspace not found' });
     throw new Error('Workspace not found');
   }
 
@@ -327,6 +362,7 @@ async function handleChatMessage(
   // Send start event
   send(ws, {
     type: 'chat_start',
+    workspaceId,
     conversationId,
   });
 
@@ -355,6 +391,7 @@ async function handleChatMessage(
       // Notify client about skipped files
       send(ws, {
         type: 'files_skipped',
+        workspaceId,
         conversationId,
         files: skippedFiles,
         reason: 'File size exceeds limit',
@@ -362,11 +399,9 @@ async function handleChatMessage(
     }
   }
 
-  // Only include history if we don't have a session to resume
-  // Session resume keeps context in the SDK, so we don't need to re-send it
-  const hasSessionResume = !!conversation.sdk_session_id;
+  // Always include history context (session resume is disabled)
   const historyContext =
-    !hasSessionResume && history.length > 0
+    history.length > 0
       ? `\n\nRecent conversation:\n${truncateHistory(history, LIMITS.historyCount)
           .map((m) => {
             // Handle both string content and ContentBlock[] (from tool use)
@@ -383,6 +418,10 @@ async function handleChatMessage(
   // Create Claude SDK runner
   const runner = new ClaudeSdkRunner();
 
+  // Track runner in activeRunners map
+  const key = runnerKey(workspaceId, conversationId);
+  runners.set(key, { runner, workspaceId, conversationId });
+
   // Accumulate response for saving
   let fullText = '';
   const toolCalls: unknown[] = [];
@@ -395,6 +434,7 @@ async function handleChatMessage(
         fullText += event.content || '';
         send(ws, {
           type: 'chat_chunk',
+          workspaceId,
           conversationId,
           text: event.content,
         });
@@ -407,6 +447,7 @@ async function handleChatMessage(
         });
         send(ws, {
           type: 'tool_use',
+          workspaceId,
           conversationId,
           tool: event.toolName,
           input: event.toolInput,
@@ -417,6 +458,7 @@ async function handleChatMessage(
         toolResults.push(event.toolResult);
         send(ws, {
           type: 'tool_result',
+          workspaceId,
           conversationId,
           result: event.toolResult,
         });
@@ -425,6 +467,7 @@ async function handleChatMessage(
       case 'error':
         send(ws, {
           type: 'chat_error',
+          workspaceId,
           conversationId,
           error: event.content,
         });
@@ -472,6 +515,7 @@ async function handleChatMessage(
     // Send completion event
     send(ws, {
       type: 'chat_complete',
+      workspaceId,
       conversationId,
       modifiedFiles: response.modifiedFiles,
       tokenUsage: response.tokenUsage,
@@ -481,6 +525,7 @@ async function handleChatMessage(
     if (response.modifiedFiles.length > 0) {
       send(ws, {
         type: 'diff_ready',
+        workspaceId,
         conversationId,
         files: response.modifiedFiles,
       });
@@ -488,10 +533,14 @@ async function handleChatMessage(
   } catch (error) {
     send(ws, {
       type: 'chat_error',
+      workspaceId,
       conversationId,
       error: error instanceof Error ? error.message : 'Chat failed',
     });
     throw error;
+  } finally {
+    // Always clean up the runner from the map
+    runners.delete(key);
   }
 
   return runner;
@@ -499,7 +548,8 @@ async function handleChatMessage(
 
 async function handleRetryMessage(
   ws: AuthenticatedSocket,
-  conversationId: string
+  conversationId: string,
+  runners: Map<string, RunnerState>
 ): Promise<ClaudeSdkRunner> {
   const db = getDb();
 
@@ -539,9 +589,11 @@ async function handleRetryMessage(
     throw new Error('Conversation not found');
   }
 
-  const workspace = getWorkspace(conversation.workspace_id);
+  const workspaceId = conversation.workspace_id;
+
+  const workspace = getWorkspace(workspaceId);
   if (!workspace) {
-    send(ws, { type: 'chat_error', error: 'Workspace not found' });
+    send(ws, { type: 'chat_error', workspaceId, error: 'Workspace not found' });
     throw new Error('Workspace not found');
   }
 
@@ -556,6 +608,7 @@ async function handleRetryMessage(
 
   send(ws, {
     type: 'conversation_created',
+    workspaceId,
     conversationId: newConversationId,
     isRetry: true,
     originalConversationId: conversationId,
@@ -564,7 +617,8 @@ async function handleRetryMessage(
   // Re-use the chat message handler with the new conversation
   return handleChatMessage(ws, {
     type: 'chat_send',
+    workspaceId,
     conversationId: newConversationId,
     message: lastUserMessage.content,
-  });
+  }, runners);
 }

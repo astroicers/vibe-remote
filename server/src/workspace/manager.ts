@@ -1,6 +1,30 @@
 import { existsSync, statSync } from 'fs';
 import { basename, resolve } from 'path';
 import { getDb, generateId } from '../db/index.js';
+import { config } from '../config.js';
+
+/**
+ * Map a host path to the container path.
+ * e.g. /home/ubuntu/myproject → /workspace/myproject
+ * If no mapping is configured or path doesn't match, returns the original path.
+ */
+function mapHostPathToContainer(inputPath: string): string {
+  const hostPath = config.WORKSPACE_HOST_PATH;
+  if (!hostPath) return inputPath;
+
+  const containerPath = config.WORKSPACE_CONTAINER_PATH;
+
+  // Normalize: ensure no trailing slash
+  const normalizedHost = hostPath.replace(/\/+$/, '');
+  const normalizedContainer = containerPath.replace(/\/+$/, '');
+  const normalizedInput = inputPath.replace(/\/+$/, '');
+
+  if (normalizedInput === normalizedHost || normalizedInput.startsWith(normalizedHost + '/')) {
+    return normalizedInput.replace(normalizedHost, normalizedContainer);
+  }
+
+  return inputPath;
+}
 
 export interface Workspace {
   id: string;
@@ -62,6 +86,10 @@ export function getWorkspace(id: string): Workspace | null {
   };
 }
 
+/**
+ * @deprecated Use explicit workspaceId parameter instead. This function relies on the
+ * single-active-workspace model which is being replaced by multi-workspace support.
+ */
 export function getActiveWorkspace(): Workspace | null {
   const db = getDb();
   const row = db.prepare(`
@@ -95,7 +123,9 @@ export interface RegisterWorkspaceInput {
 }
 
 export function registerWorkspace(input: RegisterWorkspaceInput): Workspace {
-  const absolutePath = resolve(input.path);
+  // Map host path to container path (e.g. /home/ubuntu/x → /workspace/x)
+  const mappedPath = mapHostPathToContainer(input.path);
+  const absolutePath = resolve(mappedPath);
 
   // Validate path exists and is a directory
   if (!existsSync(absolutePath)) {
@@ -138,6 +168,10 @@ export function registerWorkspace(input: RegisterWorkspaceInput): Workspace {
   };
 }
 
+/**
+ * @deprecated Use explicit workspaceId parameter instead. This function relies on the
+ * single-active-workspace model which is being replaced by multi-workspace support.
+ */
 export function setActiveWorkspace(id: string): Workspace {
   const db = getDb();
 

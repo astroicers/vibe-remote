@@ -1,5 +1,5 @@
 import simpleGit, { type SimpleGit, type StatusResult } from 'simple-git';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 export interface GitStatus {
@@ -77,14 +77,77 @@ export async function getGitDiff(workspacePath: string, staged = false): Promise
   const git = getGit(workspacePath);
 
   try {
+    let diffOutput: string;
     if (staged) {
-      return await git.diff(['--cached']);
+      diffOutput = await git.diff(['--cached']);
+    } else {
+      diffOutput = await git.diff();
     }
-    return await git.diff();
+
+    // Also include untracked (new) files, respecting .gitignore
+    const untrackedRaw = await git.raw(['ls-files', '--others', '--exclude-standard']);
+    const untrackedFiles = untrackedRaw.trim().split('\n').filter(Boolean);
+
+    if (untrackedFiles.length > 0) {
+      const untrackedDiffs = generateUntrackedDiffs(workspacePath, untrackedFiles);
+      if (untrackedDiffs) {
+        diffOutput = diffOutput ? diffOutput + '\n' + untrackedDiffs : untrackedDiffs;
+      }
+    }
+
+    return diffOutput;
   } catch (error) {
     console.error('Git diff error:', error);
     return '';
   }
+}
+
+/**
+ * Generate synthetic diff output for untracked files (shown as new files with all lines added)
+ */
+function generateUntrackedDiffs(workspacePath: string, files: string[]): string {
+  const diffs: string[] = [];
+
+  for (const filePath of files) {
+    const fullPath = join(workspacePath, filePath);
+    if (!existsSync(fullPath)) continue;
+
+    try {
+      const content = readFileSync(fullPath, 'utf-8');
+      // Skip binary files (simple heuristic: check for null bytes)
+      if (content.includes('\0')) {
+        diffs.push(
+          `diff --git a/${filePath} b/${filePath}\n` +
+          `new file mode 100644\n` +
+          `Binary files /dev/null and b/${filePath} differ`
+        );
+        continue;
+      }
+
+      const lines = content.split('\n');
+      // Remove trailing empty line that split creates
+      if (lines.length > 0 && lines[lines.length - 1] === '') {
+        lines.pop();
+      }
+
+      const lineCount = lines.length;
+      const addedLines = lines.map(l => '+' + l).join('\n');
+
+      diffs.push(
+        `diff --git a/${filePath} b/${filePath}\n` +
+        `new file mode 100644\n` +
+        `--- /dev/null\n` +
+        `+++ b/${filePath}\n` +
+        `@@ -0,0 +1,${lineCount} @@\n` +
+        addedLines
+      );
+    } catch {
+      // Skip files that can't be read (e.g., permissions)
+      continue;
+    }
+  }
+
+  return diffs.join('\n');
 }
 
 export async function getRecentCommits(workspacePath: string, count = 10): Promise<GitCommit[]> {

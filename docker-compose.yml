@@ -1,0 +1,46 @@
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount workspace for Claude to access
+      - /home/ubuntu:/workspace:rw
+      # Persist database
+      - ./server/data:/app/data
+      # Mount Claude credentials (rw: SDK needs to write debug/session files)
+      - ~/.claude:/home/node/.claude:rw
+    environment:
+      - NODE_ENV=development
+      - PORT=8080
+      - HOST=0.0.0.0
+      - JWT_SECRET=dev-secret-key-for-local-development-only-32chars
+      - CLAUDE_PERMISSION_MODE=bypassPermissions
+      - DATABASE_PATH=./data/vibe-remote.db
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
+      - WORKSPACE_HOST_PATH=/home/ubuntu
+      - WORKSPACE_CONTAINER_PATH=/workspace
+    networks:
+      - vibe-network
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    ports:
+      - "8081:5173"
+    environment:
+      # For Vite proxy (routes /api and /ws to server inside Docker network)
+      - VITE_API_URL=http://server:8080
+    networks:
+      - vibe-network
+    restart: unless-stopped
+    depends_on:
+      - server
+
+networks:
+  vibe-network:
+    driver: bridge

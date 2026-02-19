@@ -20,6 +20,12 @@ const envSchema = z.object({
   // Database
   DATABASE_PATH: z.string().default('./data/vibe-remote.db'),
 
+  // Workspace path mapping (Docker volume mount: host path → container path)
+  // When running in Docker, user inputs host paths (e.g. /home/ubuntu/myproject)
+  // but the container sees them at a different mount point (e.g. /workspace/myproject)
+  WORKSPACE_HOST_PATH: z.string().optional(),
+  WORKSPACE_CONTAINER_PATH: z.string().default('/workspace'),
+
   // VAPID for push notifications (optional in dev)
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),

@@ -71,7 +71,7 @@ export function BottomNav() {
   const tasksBadge = 0;
 
   return (
-    <nav className="flex items-center justify-around h-14 border-t border-border bg-bg-secondary">
+    <nav className="bottom-nav">
       <NavItem to="/chat" icon={ChatIcon} label="Chat" />
       <NavItem to="/diff" icon={DiffIcon} label="Diff" badge={diffBadge} />
       <NavItem to="/tasks" icon={TasksIcon} label="Tasks" badge={tasksBadge} />

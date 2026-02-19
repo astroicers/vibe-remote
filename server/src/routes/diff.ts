@@ -3,7 +3,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../auth/middleware.js';
-import { getWorkspace, getActiveWorkspace } from '../workspace/index.js';
+import { getWorkspace } from '../workspace/index.js';
 import { getGitDiff } from '../workspace/git-ops.js';
 import {
   createDiffReview,
@@ -23,14 +23,22 @@ const router = Router();
 // Apply auth to all diff routes
 router.use(authMiddleware);
 
-// Get current git diff for active workspace
-router.get('/current', async (_req, res) => {
-  const workspace = getActiveWorkspace();
-
-  if (!workspace) {
+// Get current git diff for a workspace
+router.get('/current', async (req, res) => {
+  const workspaceId = req.query.workspaceId as string | undefined;
+  if (!workspaceId) {
     res.status(400).json({
-      error: 'No active workspace',
-      code: 'NO_ACTIVE_WORKSPACE',
+      error: 'workspaceId is required',
+      code: 'MISSING_WORKSPACE_ID',
+    });
+    return;
+  }
+
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) {
+    res.status(404).json({
+      error: 'Workspace not found',
+      code: 'WORKSPACE_NOT_FOUND',
     });
     return;
   }
@@ -52,19 +60,18 @@ router.get('/current', async (_req, res) => {
   }
 });
 
-// List diff reviews for active workspace
-router.get('/reviews', (_req, res) => {
-  const workspace = getActiveWorkspace();
-
-  if (!workspace) {
+// List diff reviews for a workspace
+router.get('/reviews', (req, res) => {
+  const workspaceId = req.query.workspaceId as string | undefined;
+  if (!workspaceId) {
     res.status(400).json({
-      error: 'No active workspace',
-      code: 'NO_ACTIVE_WORKSPACE',
+      error: 'workspaceId is required',
+      code: 'MISSING_WORKSPACE_ID',
     });
     return;
   }
 
-  const reviews = listDiffReviews(workspace.id);
+  const reviews = listDiffReviews(workspaceId);
   res.json(reviews);
 });
 
@@ -86,21 +93,30 @@ router.get('/reviews/:id', (req, res) => {
 // Create a new diff review from current changes
 const createReviewSchema = z.object({
   conversationId: z.string().optional(),
+  workspaceId: z.string(),
 });
 
 router.post('/reviews', async (req, res) => {
-  const workspace = getActiveWorkspace();
+  const parsed = createReviewSchema.safeParse(req.body);
 
-  if (!workspace) {
+  if (!parsed.success) {
     res.status(400).json({
-      error: 'No active workspace',
-      code: 'NO_ACTIVE_WORKSPACE',
+      error: 'Invalid request: workspaceId is required',
+      code: 'VALIDATION_ERROR',
     });
     return;
   }
 
-  const parsed = createReviewSchema.safeParse(req.body);
-  const conversationId = parsed.success ? parsed.data.conversationId : undefined;
+  const workspace = getWorkspace(parsed.data.workspaceId);
+  if (!workspace) {
+    res.status(404).json({
+      error: 'Workspace not found',
+      code: 'WORKSPACE_NOT_FOUND',
+    });
+    return;
+  }
+
+  const conversationId = parsed.data.conversationId;
 
   try {
     const review = await createDiffReview(

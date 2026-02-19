@@ -1,4 +1,4 @@
-// Diff Store
+// Diff Store - Per-workspace partitioned state
 
 import { create } from 'zustand';
 import {
@@ -8,47 +8,71 @@ import {
   type DiffSummary,
 } from '../services/api';
 
-interface DiffState {
-  // Current diff (not yet in review)
+interface WorkspaceDiffState {
   currentDiff: DiffSummary | null;
-
-  // Reviews
   reviews: DiffReview[];
   currentReview: DiffReview | null;
-
-  // Selected file for viewing
   selectedFile: FileDiff | null;
+}
 
-  // UI state
+function createDefaultWorkspaceDiffState(): WorkspaceDiffState {
+  return {
+    currentDiff: null,
+    reviews: [],
+    currentReview: null,
+    selectedFile: null,
+  };
+}
+
+interface DiffState {
+  diffByWorkspace: Record<string, WorkspaceDiffState>;
   isLoading: boolean;
   error: string | null;
 
-  // Actions
-  loadCurrentDiff: () => Promise<void>;
-  loadReviews: () => Promise<void>;
-  loadReview: (id: string) => Promise<void>;
-  createReview: (conversationId?: string) => Promise<DiffReview>;
-  approveAll: () => Promise<void>;
-  rejectAll: () => Promise<void>;
-  approveFile: (path: string) => Promise<void>;
-  rejectFile: (path: string) => Promise<void>;
-  selectFile: (file: FileDiff | null) => void;
+  getDiffState: (workspaceId: string) => WorkspaceDiffState;
+  loadCurrentDiff: (workspaceId: string) => Promise<void>;
+  loadReviews: (workspaceId: string) => Promise<void>;
+  loadReview: (workspaceId: string, id: string) => Promise<void>;
+  createReview: (workspaceId: string, conversationId?: string) => Promise<DiffReview>;
+  approveAll: (workspaceId: string) => Promise<void>;
+  rejectAll: (workspaceId: string) => Promise<void>;
+  approveFile: (workspaceId: string, path: string) => Promise<void>;
+  rejectFile: (workspaceId: string, path: string) => Promise<void>;
+  selectFile: (workspaceId: string, file: FileDiff | null) => void;
   clearError: () => void;
 }
 
+function updateWorkspaceDiff(
+  state: DiffState,
+  workspaceId: string,
+  updater: (diffState: WorkspaceDiffState) => Partial<WorkspaceDiffState>
+): Partial<DiffState> {
+  const current = state.diffByWorkspace[workspaceId] || createDefaultWorkspaceDiffState();
+  return {
+    diffByWorkspace: {
+      ...state.diffByWorkspace,
+      [workspaceId]: { ...current, ...updater(current) },
+    },
+  };
+}
+
 export const useDiffStore = create<DiffState>((set, get) => ({
-  currentDiff: null,
-  reviews: [],
-  currentReview: null,
-  selectedFile: null,
+  diffByWorkspace: {},
   isLoading: false,
   error: null,
 
-  loadCurrentDiff: async () => {
+  getDiffState: (workspaceId: string) => {
+    return get().diffByWorkspace[workspaceId] || createDefaultWorkspaceDiffState();
+  },
+
+  loadCurrentDiff: async (workspaceId: string) => {
     set({ isLoading: true, error: null });
     try {
-      const summary = await diff.getCurrent();
-      set({ currentDiff: summary, isLoading: false });
+      const summary = await diff.getCurrent(workspaceId);
+      set((state) => ({
+        ...updateWorkspaceDiff(state, workspaceId, () => ({ currentDiff: summary })),
+        isLoading: false,
+      }));
     } catch (error) {
       set({
         isLoading: false,
@@ -57,11 +81,14 @@ export const useDiffStore = create<DiffState>((set, get) => ({
     }
   },
 
-  loadReviews: async () => {
+  loadReviews: async (workspaceId: string) => {
     set({ isLoading: true, error: null });
     try {
-      const reviews = await diff.listReviews();
-      set({ reviews, isLoading: false });
+      const reviews = await diff.listReviews(workspaceId);
+      set((state) => ({
+        ...updateWorkspaceDiff(state, workspaceId, () => ({ reviews })),
+        isLoading: false,
+      }));
     } catch (error) {
       set({
         isLoading: false,
@@ -70,15 +97,17 @@ export const useDiffStore = create<DiffState>((set, get) => ({
     }
   },
 
-  loadReview: async (id: string) => {
+  loadReview: async (workspaceId: string, id: string) => {
     set({ isLoading: true, error: null });
     try {
       const review = await diff.getReview(id);
-      set({
-        currentReview: review,
-        selectedFile: review.files[0] || null,
+      set((state) => ({
+        ...updateWorkspaceDiff(state, workspaceId, () => ({
+          currentReview: review,
+          selectedFile: review.files[0] || null,
+        })),
         isLoading: false,
-      });
+      }));
     } catch (error) {
       set({
         isLoading: false,
@@ -87,15 +116,17 @@ export const useDiffStore = create<DiffState>((set, get) => ({
     }
   },
 
-  createReview: async (conversationId?: string) => {
+  createReview: async (workspaceId: string, conversationId?: string) => {
     set({ isLoading: true, error: null });
     try {
-      const review = await diff.createReview(conversationId);
-      set({
-        currentReview: review,
-        selectedFile: review.files[0] || null,
+      const review = await diff.createReview(workspaceId, conversationId);
+      set((state) => ({
+        ...updateWorkspaceDiff(state, workspaceId, () => ({
+          currentReview: review,
+          selectedFile: review.files[0] || null,
+        })),
         isLoading: false,
-      });
+      }));
       return review;
     } catch (error) {
       set({
@@ -106,14 +137,17 @@ export const useDiffStore = create<DiffState>((set, get) => ({
     }
   },
 
-  approveAll: async () => {
-    const { currentReview } = get();
-    if (!currentReview) return;
+  approveAll: async (workspaceId: string) => {
+    const wsDiff = get().getDiffState(workspaceId);
+    if (!wsDiff.currentReview) return;
 
     set({ isLoading: true, error: null });
     try {
-      const updated = await diff.approveAll(currentReview.id);
-      set({ currentReview: updated, isLoading: false });
+      const updated = await diff.approveAll(wsDiff.currentReview.id);
+      set((state) => ({
+        ...updateWorkspaceDiff(state, workspaceId, () => ({ currentReview: updated })),
+        isLoading: false,
+      }));
     } catch (error) {
       set({
         isLoading: false,
@@ -122,14 +156,17 @@ export const useDiffStore = create<DiffState>((set, get) => ({
     }
   },
 
-  rejectAll: async () => {
-    const { currentReview } = get();
-    if (!currentReview) return;
+  rejectAll: async (workspaceId: string) => {
+    const wsDiff = get().getDiffState(workspaceId);
+    if (!wsDiff.currentReview) return;
 
     set({ isLoading: true, error: null });
     try {
-      const updated = await diff.rejectAll(currentReview.id);
-      set({ currentReview: updated, isLoading: false });
+      const updated = await diff.rejectAll(wsDiff.currentReview.id);
+      set((state) => ({
+        ...updateWorkspaceDiff(state, workspaceId, () => ({ currentReview: updated })),
+        isLoading: false,
+      }));
     } catch (error) {
       set({
         isLoading: false,
@@ -138,16 +175,19 @@ export const useDiffStore = create<DiffState>((set, get) => ({
     }
   },
 
-  approveFile: async (path: string) => {
-    const { currentReview } = get();
-    if (!currentReview) return;
+  approveFile: async (workspaceId: string, path: string) => {
+    const wsDiff = get().getDiffState(workspaceId);
+    if (!wsDiff.currentReview) return;
 
     set({ isLoading: true, error: null });
     try {
-      const result = await diff.applyActions(currentReview.id, [
+      const result = await diff.applyActions(wsDiff.currentReview.id, [
         { path, action: 'approve' },
       ]);
-      set({ currentReview: result.review, isLoading: false });
+      set((state) => ({
+        ...updateWorkspaceDiff(state, workspaceId, () => ({ currentReview: result.review })),
+        isLoading: false,
+      }));
     } catch (error) {
       set({
         isLoading: false,
@@ -156,16 +196,19 @@ export const useDiffStore = create<DiffState>((set, get) => ({
     }
   },
 
-  rejectFile: async (path: string) => {
-    const { currentReview } = get();
-    if (!currentReview) return;
+  rejectFile: async (workspaceId: string, path: string) => {
+    const wsDiff = get().getDiffState(workspaceId);
+    if (!wsDiff.currentReview) return;
 
     set({ isLoading: true, error: null });
     try {
-      const result = await diff.applyActions(currentReview.id, [
+      const result = await diff.applyActions(wsDiff.currentReview.id, [
         { path, action: 'reject' },
       ]);
-      set({ currentReview: result.review, isLoading: false });
+      set((state) => ({
+        ...updateWorkspaceDiff(state, workspaceId, () => ({ currentReview: result.review })),
+        isLoading: false,
+      }));
     } catch (error) {
       set({
         isLoading: false,
@@ -174,8 +217,8 @@ export const useDiffStore = create<DiffState>((set, get) => ({
     }
   },
 
-  selectFile: (file: FileDiff | null) => {
-    set({ selectedFile: file });
+  selectFile: (workspaceId: string, file: FileDiff | null) => {
+    set((state) => updateWorkspaceDiff(state, workspaceId, () => ({ selectedFile: file })));
   },
 
   clearError: () => set({ error: null }),
