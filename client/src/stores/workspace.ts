@@ -8,6 +8,7 @@ import {
   type GitCommit,
   type GitBranches,
 } from '../services/api';
+import { useToastStore } from './toast';
 
 interface GitState {
   gitStatus: GitStatus | null;
@@ -181,12 +182,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       set({ isLoading: false });
       get().loadGitStatus(workspaceId);
       get().loadRecentCommits(workspaceId);
+      useToastStore.getState().addToast(`Committed: ${result.hash.slice(0, 7)}`, 'success');
       return result.hash;
     } catch (error) {
-      set({
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to commit',
-      });
+      const msg = error instanceof Error ? error.message : 'Failed to commit';
+      set({ isLoading: false, error: msg });
+      useToastStore.getState().addToast(msg, 'error');
       throw error;
     }
   },
@@ -197,11 +198,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       await workspaces.push(workspaceId);
       set({ isLoading: false });
       get().loadGitStatus(workspaceId);
+      useToastStore.getState().addToast('Pushed successfully', 'success');
     } catch (error) {
-      set({
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to push',
-      });
+      const msg = error instanceof Error ? error.message : 'Failed to push';
+      set({ isLoading: false, error: msg });
+      useToastStore.getState().addToast(msg, 'error');
       throw error;
     }
   },
@@ -229,11 +230,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       set({ isLoading: false });
       get().loadGitStatus(workspaceId);
       get().loadBranches(workspaceId);
+      useToastStore.getState().addToast(`Switched to ${branch}`, 'success');
     } catch (error) {
-      set({
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to checkout',
-      });
+      const msg = error instanceof Error ? error.message : 'Failed to checkout';
+      set({ isLoading: false, error: msg });
+      useToastStore.getState().addToast(msg, 'error');
       throw error;
     }
   },

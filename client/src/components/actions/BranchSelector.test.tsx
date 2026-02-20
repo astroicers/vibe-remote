@@ -36,10 +36,14 @@ describe('BranchSelector', () => {
     vi.clearAllMocks();
   });
 
-  it('renders when open', () => {
+  it('renders when open', async () => {
     (workspaces.getBranches as ReturnType<typeof vi.fn>).mockResolvedValue(mockBranches);
     render(<BranchSelector {...defaultProps} />);
     expect(screen.getByText('Branches')).toBeInTheDocument();
+    // Wait for the async getBranches to resolve and state to settle
+    await waitFor(() => {
+      expect(screen.getByText('main')).toBeInTheDocument();
+    });
   });
 
   it('shows loading state while fetching', () => {

@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { tasks, type Task, type TaskPriority } from '../services/api';
+import { useToastStore } from './toast';
 
 interface WorkspaceTaskState {
   tasks: Task[];
@@ -61,10 +62,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         isLoading: false,
       }));
     } catch (error) {
-      set({
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to load tasks',
-      });
+      const msg = error instanceof Error ? error.message : 'Failed to load tasks';
+      set({ isLoading: false, error: msg });
+      useToastStore.getState().addToast(msg, 'error');
     }
   },
 
@@ -80,10 +80,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       }));
       return task;
     } catch (error) {
-      set({
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to create task',
-      });
+      const msg = error instanceof Error ? error.message : 'Failed to create task';
+      set({ isLoading: false, error: msg });
+      useToastStore.getState().addToast(msg, 'error');
       throw error;
     }
   },
@@ -118,10 +117,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         isLoading: false,
       }));
     } catch (error) {
-      set({
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to delete task',
-      });
+      const msg = error instanceof Error ? error.message : 'Failed to delete task';
+      set({ isLoading: false, error: msg });
+      useToastStore.getState().addToast(msg, 'error');
       throw error;
     }
   },
@@ -136,9 +134,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         })),
       }));
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to run task',
-      });
+      const msg = error instanceof Error ? error.message : 'Failed to run task';
+      set({ error: msg });
+      useToastStore.getState().addToast(msg, 'error');
       throw error;
     }
   },
@@ -153,9 +151,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         })),
       }));
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to cancel task',
-      });
+      const msg = error instanceof Error ? error.message : 'Failed to cancel task';
+      set({ error: msg });
+      useToastStore.getState().addToast(msg, 'error');
       throw error;
     }
   },

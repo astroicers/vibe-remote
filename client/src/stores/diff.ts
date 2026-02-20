@@ -7,6 +7,7 @@ import {
   type FileDiff,
   type DiffSummary,
 } from '../services/api';
+import { useToastStore } from './toast';
 
 interface WorkspaceDiffState {
   currentDiff: DiffSummary | null;
@@ -75,10 +76,9 @@ export const useDiffStore = create<DiffState>((set, get) => ({
         isLoading: false,
       }));
     } catch (error) {
-      set({
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to load diff',
-      });
+      const msg = error instanceof Error ? error.message : 'Failed to load diff';
+      set({ isLoading: false, error: msg });
+      useToastStore.getState().addToast(msg, 'error');
     }
   },
 
@@ -130,10 +130,9 @@ export const useDiffStore = create<DiffState>((set, get) => ({
       }));
       return review;
     } catch (error) {
-      set({
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to create review',
-      });
+      const msg = error instanceof Error ? error.message : 'Failed to create review';
+      set({ isLoading: false, error: msg });
+      useToastStore.getState().addToast(msg, 'error');
       throw error;
     }
   },
@@ -190,10 +189,9 @@ export const useDiffStore = create<DiffState>((set, get) => ({
         isLoading: false,
       }));
     } catch (error) {
-      set({
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to approve file',
-      });
+      const msg = error instanceof Error ? error.message : 'Failed to approve file';
+      set({ isLoading: false, error: msg });
+      useToastStore.getState().addToast(msg, 'error');
     }
   },
 
@@ -211,10 +209,9 @@ export const useDiffStore = create<DiffState>((set, get) => ({
         isLoading: false,
       }));
     } catch (error) {
-      set({
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to reject file',
-      });
+      const msg = error instanceof Error ? error.message : 'Failed to reject file';
+      set({ isLoading: false, error: msg });
+      useToastStore.getState().addToast(msg, 'error');
     }
   },
 

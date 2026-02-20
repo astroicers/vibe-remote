@@ -4,6 +4,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../auth/middleware.js';
 import { TaskManager, TaskQueue, type Task } from '../tasks/index.js';
+import { runTask } from '../tasks/runner.js';
 import { broadcastTaskStatus } from '../ws/index.js';
 
 const router = Router();
@@ -15,12 +16,8 @@ router.use(authMiddleware);
 const taskManager = new TaskManager();
 const taskQueue = new TaskQueue(taskManager);
 
-// Set up a stub runner (real AI runner will be integrated later)
-taskQueue.setRunner(async (task: Task) => {
-  console.log(`[task-queue] Running task: ${task.id} - ${task.title}`);
-  // Stub: just wait a bit and return success
-  return { result: `Task "${task.title}" completed (stub runner)` };
-});
+// Replace stub with real AI runner
+taskQueue.setRunner(runTask);
 
 // Broadcast task status changes via WebSocket
 taskQueue.onTaskStatusChange((task: Task) => {

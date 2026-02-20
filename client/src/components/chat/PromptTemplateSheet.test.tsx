@@ -42,10 +42,14 @@ describe('PromptTemplateSheet', () => {
     vi.clearAllMocks();
   });
 
-  it('renders when open', () => {
+  it('renders when open', async () => {
     (templates.list as ReturnType<typeof vi.fn>).mockResolvedValue(mockTemplates);
     render(<PromptTemplateSheet {...defaultProps} />);
     expect(screen.getByText('Prompt Templates')).toBeInTheDocument();
+    // Wait for the async templates.list to resolve and state to settle
+    await waitFor(() => {
+      expect(screen.getByText('Fix Bug')).toBeInTheDocument();
+    });
   });
 
   it('shows loading state', () => {

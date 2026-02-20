@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { chat, type Conversation, type Message } from '../services/api';
 import { ws, sendChatMessage } from '../services/websocket';
 import { useWorkspaceStore } from './workspace';
+import { useToastStore } from './toast';
 
 export interface TokenUsage {
   inputTokens: number;
@@ -183,7 +184,9 @@ export const useChatStore = create<ChatState>((set, get) => {
           }))
         );
       }
-      set({ error: data.error as string });
+      const errorMsg = data.error as string;
+      set({ error: errorMsg });
+      useToastStore.getState().addToast(errorMsg, 'error');
     });
 
     ws.on('diff_ready', (data) => {
@@ -254,7 +257,9 @@ export const useChatStore = create<ChatState>((set, get) => {
           }));
         });
       } catch (error) {
-        set({ error: error instanceof Error ? error.message : 'Failed to load conversations' });
+        const msg = error instanceof Error ? error.message : 'Failed to load conversations';
+        set({ error: msg });
+        useToastStore.getState().addToast(msg, 'error');
       }
     },
 
@@ -268,37 +273,46 @@ export const useChatStore = create<ChatState>((set, get) => {
           }))
         );
       } catch (error) {
-        set({ error: error instanceof Error ? error.message : 'Failed to load conversation' });
+        const msg = error instanceof Error ? error.message : 'Failed to load conversation';
+        set({ error: msg });
+        useToastStore.getState().addToast(msg, 'error');
       }
     },
 
     createConversation: async (workspaceId: string) => {
-      // Refresh conversations from server to get latest titles
-      await get().loadConversations(workspaceId);
-      const wsChat = get().getWorkspaceChat(workspaceId);
+      try {
+        // Refresh conversations from server to get latest titles
+        await get().loadConversations(workspaceId);
+        const wsChat = get().getWorkspaceChat(workspaceId);
 
-      // Check if there's already an empty conversation (title still "New Conversation")
-      const emptyConv = wsChat.conversations.find((c) => c.title === 'New Conversation');
-      if (emptyConv) {
-        // Reuse existing empty conversation
+        // Check if there's already an empty conversation (title still "New Conversation")
+        const emptyConv = wsChat.conversations.find((c) => c.title === 'New Conversation');
+        if (emptyConv) {
+          // Reuse existing empty conversation
+          set((state) =>
+            updateWorkspaceChat(state, workspaceId, () => ({
+              currentConversationId: emptyConv.id,
+              messages: [],
+            }))
+          );
+          return emptyConv.id;
+        }
+
+        const conversation = await chat.createConversation({ workspaceId });
         set((state) =>
-          updateWorkspaceChat(state, workspaceId, () => ({
-            currentConversationId: emptyConv.id,
+          updateWorkspaceChat(state, workspaceId, (current) => ({
+            conversations: [conversation, ...current.conversations],
+            currentConversationId: conversation.id,
             messages: [],
           }))
         );
-        return emptyConv.id;
+        return conversation.id;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Failed to create conversation';
+        set({ error: msg });
+        useToastStore.getState().addToast(msg, 'error');
+        throw error;
       }
-
-      const conversation = await chat.createConversation({ workspaceId });
-      set((state) =>
-        updateWorkspaceChat(state, workspaceId, (current) => ({
-          conversations: [conversation, ...current.conversations],
-          currentConversationId: conversation.id,
-          messages: [],
-        }))
-      );
-      return conversation.id;
     },
 
     selectConversation: (workspaceId: string, conversationId: string) => {
@@ -359,7 +373,9 @@ export const useChatStore = create<ChatState>((set, get) => {
           }));
         });
       } catch (error) {
-        set({ error: error instanceof Error ? error.message : 'Failed to delete conversation' });
+        const msg = error instanceof Error ? error.message : 'Failed to delete conversation';
+        set({ error: msg });
+        useToastStore.getState().addToast(msg, 'error');
       }
     },
 
