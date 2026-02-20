@@ -70,6 +70,8 @@ interface ChatState {
   sendMessage: (workspaceId: string, content: string, selectedFiles?: string[]) => void;
   retryConversation: (workspaceId: string, conversationId: string) => void;
 
+  deleteConversation: (workspaceId: string, conversationId: string) => Promise<void>;
+
   incrementUnread: (workspaceId: string) => void;
   clearUnread: (workspaceId: string) => void;
 
@@ -238,7 +240,15 @@ export const useChatStore = create<ChatState>((set, get) => {
     loadConversations: async (workspaceId: string) => {
       try {
         const conversations = await chat.listConversations(workspaceId);
-        set((state) => updateWorkspaceChat(state, workspaceId, () => ({ conversations })));
+        set((state) => {
+          const current = state.workspaceChats[workspaceId] || createDefaultWorkspaceChatState();
+          // Auto-select the most recent conversation if none is selected
+          const shouldAutoSelect = !current.currentConversationId && conversations.length > 0;
+          return updateWorkspaceChat(state, workspaceId, () => ({
+            conversations,
+            ...(shouldAutoSelect ? { currentConversationId: conversations[0].id } : {}),
+          }));
+        });
       } catch (error) {
         set({ error: error instanceof Error ? error.message : 'Failed to load conversations' });
       }
@@ -259,9 +269,27 @@ export const useChatStore = create<ChatState>((set, get) => {
     },
 
     createConversation: async (workspaceId: string) => {
+      // Refresh conversations from server to get latest titles
+      await get().loadConversations(workspaceId);
+      const wsChat = get().getWorkspaceChat(workspaceId);
+
+      // Check if there's already an empty conversation (title still "New Conversation")
+      const emptyConv = wsChat.conversations.find((c) => c.title === 'New Conversation');
+      if (emptyConv) {
+        // Reuse existing empty conversation
+        set((state) =>
+          updateWorkspaceChat(state, workspaceId, () => ({
+            currentConversationId: emptyConv.id,
+            messages: [],
+          }))
+        );
+        return emptyConv.id;
+      }
+
       const conversation = await chat.createConversation({ workspaceId });
       set((state) =>
-        updateWorkspaceChat(state, workspaceId, () => ({
+        updateWorkspaceChat(state, workspaceId, (current) => ({
+          conversations: [conversation, ...current.conversations],
           currentConversationId: conversation.id,
           messages: [],
         }))
@@ -307,6 +335,28 @@ export const useChatStore = create<ChatState>((set, get) => {
         workspaceId,
         conversationId,
       });
+    },
+
+    deleteConversation: async (workspaceId: string, conversationId: string) => {
+      try {
+        await chat.deleteConversation(conversationId);
+        set((state) => {
+          const wsChat = state.workspaceChats[workspaceId] || createDefaultWorkspaceChatState();
+          const remaining = wsChat.conversations.filter((c) => c.id !== conversationId);
+          const needNewSelection = wsChat.currentConversationId === conversationId;
+          return updateWorkspaceChat(state, workspaceId, () => ({
+            conversations: remaining,
+            ...(needNewSelection
+              ? {
+                  currentConversationId: remaining.length > 0 ? remaining[0].id : null,
+                  messages: [],
+                }
+              : {}),
+          }));
+        });
+      } catch (error) {
+        set({ error: error instanceof Error ? error.message : 'Failed to delete conversation' });
+      }
     },
 
     incrementUnread: (workspaceId: string) => {

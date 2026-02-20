@@ -33,6 +33,7 @@ export function ChatPage() {
     approveToolUse,
     rejectToolUse,
     createConversation,
+    loadConversations,
     loadConversation,
     clearUnread,
     error,
@@ -84,6 +85,13 @@ export function ChatPage() {
     }
   }, [wsId, clearUnread]);
 
+  // Load conversations when workspace changes — auto-selects the most recent one
+  useEffect(() => {
+    if (wsId && isAuthenticated) {
+      loadConversations(wsId);
+    }
+  }, [wsId, isAuthenticated, loadConversations]);
+
   // Load conversation messages when switching conversation
   useEffect(() => {
     if (wsId && currentConversationId) {
@@ -108,27 +116,11 @@ export function ChatPage() {
 
   return (
     <AppLayout>
-      {/* Header */}
+      {/* Header — tap to switch conversation */}
       <header className="flex items-center px-4 h-14 border-b border-border bg-bg-secondary flex-shrink-0">
-        <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-bg-tertiary">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className="w-5 h-5 text-text-secondary"
-          >
-            <path
-              fillRule="evenodd"
-              d="M3 6.75A.75.75 0 0 1 3.75 6h16.5a.75.75 0 0 1 0 1.5H3.75A.75.75 0 0 1 3 6.75ZM3 12a.75.75 0 0 1 .75-.75h16.5a.75.75 0 0 1 0 1.5H3.75A.75.75 0 0 1 3 12Zm0 5.25a.75.75 0 0 1 .75-.75h16.5a.75.75 0 0 1 0 1.5H3.75a.75.75 0 0 1-.75-.75Z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-
-        {/* Tappable header to open conversation selector */}
         <button
           onClick={() => wsId && setShowConversations(true)}
-          className="flex-1 ml-3 text-left"
+          className="flex-1 text-left"
         >
           <h1 className="text-base font-medium text-text-primary">{headerTitle}</h1>
           <p className="text-xs text-text-muted flex items-center gap-1">
@@ -139,21 +131,14 @@ export function ChatPage() {
           </p>
         </button>
 
+        {/* New conversation */}
         <button
-          onClick={() => navigate('/repos')}
+          onClick={handleNewConversation}
           className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-bg-tertiary"
+          title="New conversation"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className="w-5 h-5 text-text-secondary"
-          >
-            <path
-              fillRule="evenodd"
-              d="M2.25 5.25a3 3 0 0 1 3-3h13.5a3 3 0 0 1 3 3v13.5a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V5.25Zm3.75.75a.75.75 0 0 0 0 1.5h1.5a.75.75 0 0 0 0-1.5H6Zm3 0a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5ZM6 9.75a.75.75 0 0 0 0 1.5h1.5a.75.75 0 0 0 0-1.5H6Zm3 0a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5ZM6 13.5a.75.75 0 0 0 0 1.5h1.5a.75.75 0 0 0 0-1.5H6Zm3 0a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5Z"
-              clipRule="evenodd"
-            />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-text-secondary">
+            <path fillRule="evenodd" d="M12 3.75a.75.75 0 0 1 .75.75v6.75h6.75a.75.75 0 0 1 0 1.5h-6.75v6.75a.75.75 0 0 1-1.5 0v-6.75H4.5a.75.75 0 0 1 0-1.5h6.75V4.5a.75.75 0 0 1 .75-.75Z" clipRule="evenodd" />
           </svg>
         </button>
       </header>

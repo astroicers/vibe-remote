@@ -3,17 +3,19 @@
 ## 前置需求
 
 ```
-Node.js 20+ (LTS)
+Node.js 20+ (LTS, 推薦 22)
 npm 10+
 Git 2.30+
 Tailscale (installed and logged in)
-Anthropic API key (claude.ai → API keys)
+Claude 認證（擇一）:
+  - CLAUDE_CODE_OAUTH_TOKEN (透過 `claude setup-token` 取得)
+  - ANTHROPIC_API_KEY (從 console.anthropic.com 取得)
 ```
 
 Optional:
 ```
-ripgrep (rg) — for codebase search (fallback: grep)
-GitHub CLI (gh) — for PR creation
+Docker + Docker Compose  — 容器化部署
+GitHub CLI (gh)          — PR 相關操作
 ```
 
 ## 初始設定
@@ -25,7 +27,7 @@ cd vibe-remote
 
 # 環境變數
 cp .env.example .env
-# 編輯 .env，填入 ANTHROPIC_API_KEY 和 JWT_SECRET
+# 編輯 .env，填入認證資訊（CLAUDE_CODE_OAUTH_TOKEN 或 ANTHROPIC_API_KEY）和 JWT_SECRET
 
 # 安裝依賴
 cd server && npm install && cd ..
@@ -34,7 +36,7 @@ cd client && npm install && cd ..
 # 啟動開發模式
 npm run dev
 # → Server: http://localhost:3000
-# → Client (Vite): http://localhost:5173 (proxy to 3000)
+# → Client (Vite): http://localhost:5173 (proxy API/WS to :3000)
 ```
 
 ## 專案結構
@@ -43,6 +45,10 @@ npm run dev
 vibe-remote/
 ├── CLAUDE.md                      # Claude Code 開發指引
 ├── README.md                      # GitHub 首頁
+├── package.json                   # Root monorepo scripts (concurrently)
+├── docker-compose.yml             # Docker Compose（server:8080 + client:8081）
+├── .env.example                   # 環境變數範本
+│
 ├── docs/                          # 設計文件
 │   ├── ARCHITECTURE.md
 │   ├── API_SPEC.md
@@ -53,67 +59,64 @@ vibe-remote/
 │   ├── DEVELOPMENT.md             # ← 你在這裡
 │   └── ROADMAP.md
 │
-├── server/                        # Backend
+├── server/                        # Backend (Node.js + Express + TypeScript)
 │   ├── src/
 │   │   ├── index.ts               # Entry: Express + WS server
-│   │   ├── config.ts              # 環境變數 + 設定管理
-│   │   ├── routes/                # Express route handlers
-│   │   │   ├── auth.ts
-│   │   │   ├── workspaces.ts
-│   │   │   ├── chat.ts
-│   │   │   ├── diff.ts
-│   │   │   ├── git.ts
-│   │   │   ├── tasks.ts
-│   │   │   ├── terminal.ts
-│   │   │   └── templates.ts
-│   │   ├── ws/                    # WebSocket event handlers
-│   │   │   ├── index.ts           # WS server setup + connection handler
-│   │   │   └── handlers.ts        # Event routing
-│   │   ├── auth/
-│   │   │   ├── jwt.ts             # JWT sign/verify/refresh
+│   │   ├── config.ts              # 環境變數管理（zod validated）
+│   │   ├── auth/                  # JWT + QR pairing
+│   │   │   ├── index.ts
+│   │   │   ├── jwt.ts             # JWT sign/verify
+│   │   │   ├── jwt.test.ts
 │   │   │   ├── middleware.ts      # Express auth middleware
 │   │   │   └── pairing.ts        # QR code + pairing code
-│   │   ├── ai/
-│   │   │   ├── claude-client.ts   # Anthropic SDK wrapper + streaming
+│   │   ├── ai/                    # Claude Agent SDK 整合
+│   │   │   ├── index.ts
+│   │   │   ├── claude-sdk.ts      # ClaudeSdkRunner（streaming + tool tracking）
 │   │   │   ├── context-builder.ts # Project context 組裝
-│   │   │   ├── tool-executor.ts   # Tool use 執行 + 安全驗證
-│   │   │   ├── tools.ts           # Tool definitions (JSON schema)
-│   │   │   └── prompts.ts         # System prompts
-│   │   ├── workspace/
-│   │   │   ├── manager.ts         # Workspace CRUD
+│   │   │   └── types.ts
+│   │   ├── workspace/             # Git ops + file tree
+│   │   │   ├── index.ts
+│   │   │   ├── manager.ts         # Workspace CRUD + path mapping
 │   │   │   ├── git-ops.ts         # simple-git wrapper
-│   │   │   ├── file-tree.ts       # 目錄結構產生器
-│   │   │   ├── file-watcher.ts    # chokidar 監聽
-│   │   │   └── search.ts          # ripgrep/grep wrapper
-│   │   ├── tasks/                 # Phase 2
-│   │   │   ├── queue.ts
-│   │   │   ├── runner.ts
-│   │   │   ├── branch-manager.ts
-│   │   │   └── dependency.ts
-│   │   ├── terminal/
-│   │   │   ├── runner.ts          # Command execution
-│   │   │   └── validator.ts       # Command whitelist/blacklist
-│   │   ├── notifications/
-│   │   │   └── web-push.ts        # VAPID + push
-│   │   ├── db/
-│   │   │   ├── sqlite.ts          # DB connection + init
-│   │   │   ├── migrate.ts         # Migration runner
-│   │   │   └── migrations/
-│   │   │       ├── 001_initial.sql
-│   │   │       └── ...
-│   │   ├── middleware/
-│   │   │   ├── error-handler.ts   # Global error handler
-│   │   │   ├── rate-limiter.ts    # Rate limiting setup
-│   │   │   └── validate.ts        # Zod validation middleware
-│   │   └── utils/
-│   │       ├── id.ts              # nanoid helpers (ws_xxx, conv_xxx)
-│   │       └── logger.ts          # Structured logging
+│   │   │   └── file-tree.ts       # 目錄結構產生器
+│   │   ├── diff/                  # Diff 解析與管理
+│   │   │   ├── index.ts
+│   │   │   ├── manager.ts         # Diff CRUD
+│   │   │   ├── parser.ts          # Unified diff parser
+│   │   │   └── types.ts
+│   │   ├── routes/                # Express route handlers
+│   │   │   ├── index.ts           # Route aggregator
+│   │   │   ├── auth.ts
+│   │   │   ├── chat.ts
+│   │   │   ├── diff.ts
+│   │   │   ├── workspaces.ts      # CRUD + git operations
+│   │   │   └── notifications.ts
+│   │   ├── ws/                    # WebSocket event handlers
+│   │   │   ├── index.ts
+│   │   │   ├── chat-handler.ts    # Main handler（chat_send, retry, tool approval）
+│   │   │   ├── rate-limit.ts      # Per-device rate limiting
+│   │   │   ├── rate-limit.test.ts
+│   │   │   ├── tool-approval.ts   # Tool approval workflow
+│   │   │   └── tool-approval.test.ts
+│   │   ├── notifications/         # Push notifications
+│   │   │   ├── index.ts
+│   │   │   └── push.ts            # web-push wrapper
+│   │   ├── db/                    # SQLite 資料庫
+│   │   │   ├── index.ts           # DB init + helpers + migrations
+│   │   │   └── schema.ts          # CREATE TABLE statements
+│   │   ├── utils/
+│   │   │   └── truncate.ts        # 訊息/檔案截斷工具
+│   │   ├── tasks/                 # Phase 2（目前空目錄）
+│   │   ├── terminal/              # Phase 2（目前空目錄）
+│   │   └── test/
+│   │       └── setup.ts           # Vitest setup
+│   ├── Dockerfile                 # Node 22-slim + better-sqlite3 build deps
 │   ├── package.json
 │   └── tsconfig.json
 │
 ├── client/                        # Frontend (React PWA)
 │   ├── src/
-│   │   ├── App.tsx                # Root component + router
+│   │   ├── App.tsx                # Route definitions
 │   │   ├── main.tsx               # Entry point
 │   │   ├── pages/
 │   │   │   ├── ChatPage.tsx
@@ -122,51 +125,56 @@ vibe-remote/
 │   │   │   ├── ReposPage.tsx
 │   │   │   └── SettingsPage.tsx
 │   │   ├── components/
-│   │   │   ├── chat/
-│   │   │   ├── diff/
-│   │   │   ├── tasks/
-│   │   │   ├── workspace/
-│   │   │   ├── actions/
-│   │   │   └── common/
-│   │   ├── hooks/
-│   │   │   ├── useWebSocket.ts
-│   │   │   ├── useSpeechRecognition.ts
-│   │   │   ├── useNotifications.ts
-│   │   │   └── useApi.ts
+│   │   │   ├── AppLayout.tsx      # Layout wrapper（WorkspaceTabs + BottomNav）
+│   │   │   ├── BottomNav.tsx      # 5-tab 底部導覽
+│   │   │   ├── BottomSheet.tsx    # 滑出式面板
+│   │   │   ├── ConversationSelector.tsx  # 對話選擇器
+│   │   │   ├── Toast.tsx          # Toast 通知
+│   │   │   ├── WorkspaceTabs.tsx  # Workspace 切換 tabs
+│   │   │   ├── chat/              # Chat UI 元件
+│   │   │   │   ├── MessageList.tsx
+│   │   │   │   ├── MessageBubble.tsx
+│   │   │   │   ├── ChatInput.tsx
+│   │   │   │   ├── TokenUsageCard.tsx
+│   │   │   │   ├── ToolApprovalCard.tsx
+│   │   │   │   └── index.ts
+│   │   │   ├── diff/              # Diff review 元件
+│   │   │   │   ├── DiffViewer.tsx
+│   │   │   │   ├── FileList.tsx
+│   │   │   │   ├── ReviewActions.tsx
+│   │   │   │   └── index.ts
+│   │   │   └── actions/           # Quick Actions 元件
+│   │   │       ├── QuickActions.tsx
+│   │   │       ├── GitStatusCard.tsx
+│   │   │       ├── ActionButton.tsx
+│   │   │       └── index.ts
 │   │   ├── stores/                # zustand stores
-│   │   │   ├── authStore.ts
-│   │   │   ├── chatStore.ts
-│   │   │   ├── diffStore.ts
-│   │   │   ├── workspaceStore.ts
-│   │   │   └── taskStore.ts
+│   │   │   ├── auth.ts            # JWT + device 狀態
+│   │   │   ├── chat.ts            # Per-workspace 對話（workspaceChats map）
+│   │   │   ├── workspace.ts       # Workspace 列表 + Git state
+│   │   │   ├── diff.ts            # Diff review 狀態
+│   │   │   └── toast.ts           # Toast 通知佇列
 │   │   ├── services/
-│   │   │   ├── api.ts             # REST client (fetch wrapper)
-│   │   │   └── ws.ts              # WebSocket client + auto-reconnect
-│   │   ├── types/
-│   │   │   └── index.ts           # Client-side types
-│   │   ├── styles/
-│   │   │   └── globals.css        # Tailwind directives + custom CSS vars
-│   │   ├── manifest.json          # PWA manifest
-│   │   └── service-worker.ts
+│   │   │   ├── api.ts             # REST client（fetch wrapper）
+│   │   │   ├── websocket.ts       # WebSocket auto-reconnect client
+│   │   │   ├── push.ts            # Push notification subscription
+│   │   │   └── speech.ts          # Web Speech API wrapper
+│   │   ├── hooks/
+│   │   │   ├── usePushNotifications.ts
+│   │   │   └── useSpeech.ts
+│   │   └── styles/
+│   │       └── globals.css        # Tailwind directives + CSS variables
 │   ├── public/
-│   │   └── icons/                 # PWA icons (192, 512)
+│   │   └── icons/                 # PWA SVG icons
+│   ├── Dockerfile                 # Node 22-slim（dev server）
 │   ├── index.html
 │   ├── package.json
 │   ├── vite.config.ts
 │   ├── tailwind.config.ts
 │   └── tsconfig.json
 │
-├── shared/                        # Server + Client 共用
-│   ├── types.ts                   # API request/response types
-│   └── constants.ts               # Shared constants
-│
-├── docker-compose.yml
-├── Dockerfile
-├── .env.example
-├── .gitignore
-├── .eslintrc.cjs
-├── .prettierrc
-└── package.json                   # Root scripts (dev, build, lint)
+└── shared/                        # Server + Client 共用
+    └── types.ts                   # API request/response types
 ```
 
 ## npm Scripts
@@ -176,14 +184,17 @@ vibe-remote/
 ```json
 {
   "scripts": {
-    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
-    "build": "npm --prefix server run build && npm --prefix client run build",
-    "start": "npm --prefix server run start",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm run build:server && npm run build:client",
+    "build:server": "npm --prefix server run build",
+    "build:client": "npm --prefix client run build",
     "lint": "npm --prefix server run lint && npm --prefix client run lint",
     "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck"
   },
   "devDependencies": {
-    "concurrently": "^8.0.0"
+    "concurrently": "^8.2.2"
   }
 }
 ```
@@ -196,8 +207,11 @@ vibe-remote/
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "lint": "eslint src/",
-    "typecheck": "tsc --noEmit"
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
   }
 }
 ```
@@ -207,10 +221,10 @@ vibe-remote/
 ```json
 {
   "scripts": {
-    "dev": "vite --port 5173",
-    "build": "tsc && vite build",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "lint": "eslint src/",
+    "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit"
   }
 }
@@ -224,11 +238,11 @@ vibe-remote/
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "lib": ["ES2022"],
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": "..",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -237,11 +251,17 @@ vibe-remote/
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
     "paths": {
       "@shared/*": ["../shared/*"]
-    }
+    },
+    "baseUrl": "."
   },
-  "include": ["src/**/*", "../shared/**/*"]
+  "include": ["src/**/*", "../shared/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
 ```
 
@@ -250,21 +270,28 @@ vibe-remote/
 ```json
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
     "paths": {
       "@/*": ["./src/*"],
       "@shared/*": ["../shared/*"]
-    }
+    },
+    "baseUrl": "."
   },
-  "include": ["src/**/*", "../shared/**/*"]
+  "include": ["src", "../shared"]
 }
 ```
 
@@ -288,7 +315,7 @@ Types/IFs:     PascalCase         interface WorkspaceStatus
 ```typescript
 // 1. Node.js builtins
 import path from 'path';
-import { readFile } from 'fs/promises';
+import { readFileSync, existsSync } from 'fs';
 
 // 2. External packages
 import express from 'express';
@@ -298,56 +325,38 @@ import { z } from 'zod';
 import type { Workspace } from '@shared/types';
 
 // 4. Internal (relative)
-import { db } from '../db/sqlite';
-import { validatePath } from './validator';
+import { getDb } from '../db/index.js';
+import { config } from '../config.js';
 ```
+
+> **Note**: Server imports 使用 `.js` extension（ESM module resolution 要求）。
 
 ### Error Handling
 
 ```typescript
 // Server: 統一 error 格式
-class AppError extends Error {
-  constructor(
-    public statusCode: number,
-    public code: string,
-    message: string,
-    public details?: unknown
-  ) {
-    super(message);
-  }
-}
+// 目前使用簡單的 throw + Express error handler
+// API routes 回傳格式:
+res.status(404).json({
+  error: 'Workspace not found',
+  code: 'NOT_FOUND',
+});
 
-// 使用
-throw new AppError(404, 'NOT_FOUND', 'Workspace not found');
-throw new AppError(422, 'VALIDATION_ERROR', 'Invalid path', errors);
-
-// Global error handler 自動格式化
-app.use((err, req, res, next) => {
-  if (err instanceof AppError) {
-    res.status(err.statusCode).json({
-      error: err.message,
-      code: err.code,
-      details: err.details,
-    });
-  } else {
-    res.status(500).json({
-      error: 'Internal server error',
-      code: 'INTERNAL_ERROR',
-    });
-  }
+res.status(400).json({
+  error: 'Validation failed',
+  code: 'VALIDATION_ERROR',
+  details: zodError.format(),
 });
 ```
 
 ### Logging
 
 ```typescript
-// 使用 structured logging
-// 可以用簡單的 console 或 pino
-import { logger } from './utils/logger';
-
-logger.info('Server started', { port: 3000, host: '0.0.0.0' });
-logger.error('AI request failed', { error: err.message, conversationId });
-logger.warn('Rate limit hit', { deviceId, endpoint: '/api/chat/send' });
+// 目前使用 console.log / console.error / console.warn
+// 帶 emoji prefix 區分類型:
+console.log('✅ Server started', { port, host });
+console.error('❌ Database error', error.message);
+console.warn('⚠️ No Claude authentication configured');
 ```
 
 ## Vite Proxy 設定
@@ -359,10 +368,14 @@ logger.warn('Rate limit hit', { deviceId, endpoint: '/api/chat/send' });
 export default defineConfig({
   server: {
     port: 5173,
+    host: '0.0.0.0',
     proxy: {
-      '/api': 'http://localhost:3000',
+      '/api': {
+        target: process.env.VITE_API_URL || 'http://localhost:3000',
+        changeOrigin: true,
+      },
       '/ws': {
-        target: 'ws://localhost:3000',
+        target: (process.env.VITE_API_URL || 'http://localhost:3000').replace('http', 'ws'),
         ws: true,
       },
     },
@@ -370,51 +383,231 @@ export default defineConfig({
 });
 ```
 
+Docker 內 client 透過 `VITE_API_URL=http://server:8080` 指向同網路內的 server container。
+
 ## Docker
 
-```dockerfile
-# Dockerfile
-FROM node:20-alpine
+### 架構
 
-# better-sqlite3 需要 build tools
-RUN apk add --no-cache python3 make g++ git
+Docker Compose 使用雙容器架構（而非單一容器）：
+
+```
+┌─────────────────────────────────────────────┐
+│ Docker Compose (vibe-network bridge)        │
+│                                             │
+│  ┌─────────────┐     ┌──────────────┐       │
+│  │   server     │     │    client    │       │
+│  │ Node 22-slim │     │ Node 22-slim │       │
+│  │ Port: 8080   │◄────│ VITE proxy   │       │
+│  │ SQLite + SDK │     │ Port: 5173   │       │
+│  └──────┬───────┘     └──────┬───────┘       │
+│         │                    │               │
+└─────────┼────────────────────┼───────────────┘
+          │                    │
+     host:8080            host:8081
+```
+
+### Server Dockerfile
+
+```dockerfile
+FROM node:22-slim
 
 WORKDIR /app
 
-# Server dependencies
-COPY server/package*.json server/
-RUN cd server && npm ci --production
+# better-sqlite3 需要 build tools
+RUN apt-get update && apt-get install -y \
+    python3 make g++ git \
+    && rm -rf /var/lib/apt/lists/*
 
-# Client build
-COPY client/package*.json client/
-RUN cd client && npm ci
-COPY client/ client/
-COPY shared/ shared/
-RUN cd client && npm run build
+# Claude Code CLI（Agent SDK 依賴）
+RUN npm install -g @anthropic-ai/claude-code
 
-# Server build
-COPY server/ server/
-RUN cd server && npm run build
+COPY package*.json ./
+RUN npm ci
 
-# 把 client build 放到 server 可以 serve 的位置
-RUN cp -r client/dist server/public
+COPY . .
 
-EXPOSE 3000
-CMD ["node", "server/dist/index.js"]
+# 建立資料目錄和 workspace mount point
+# node user (uid 1000) 對應 host ubuntu user (uid 1000)
+RUN mkdir -p data /workspace && \
+    chown -R node:node /app /workspace
+
+EXPOSE 8080
+
+# Claude CLI 拒絕以 root 執行 --dangerously-skip-permissions
+USER node
+
+CMD ["npx", "tsx", "src/index.ts"]
 ```
 
-## 測試策略（建議但 MVP 可跳過）
+### Client Dockerfile
+
+```dockerfile
+FROM node:22-slim
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+COPY . .
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+```
+
+### docker-compose.yml
+
+```yaml
+services:
+  server:
+    build: { context: ./server, dockerfile: Dockerfile }
+    ports: ["8080:8080"]
+    volumes:
+      - /home/ubuntu:/workspace:rw        # Workspace 掛載
+      - ./server/data:/app/data            # DB 持久化
+      - ~/.claude:/home/node/.claude:rw    # Claude SDK credentials
+    environment:
+      - PORT=8080
+      - JWT_SECRET=dev-secret-key-...
+      - CLAUDE_PERMISSION_MODE=bypassPermissions
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
+      - WORKSPACE_HOST_PATH=/home/ubuntu
+      - WORKSPACE_CONTAINER_PATH=/workspace
+    networks: [vibe-network]
+
+  client:
+    build: { context: ./client, dockerfile: Dockerfile }
+    ports: ["8081:5173"]
+    environment:
+      - VITE_API_URL=http://server:8080
+    depends_on: [server]
+    networks: [vibe-network]
+
+networks:
+  vibe-network:
+    driver: bridge
+```
+
+### Docker 啟動
+
+```bash
+# 建置並啟動
+docker compose up -d --build
+
+# 查看 logs
+docker compose logs -f
+
+# 停止
+docker compose down
+
+# 存取
+# Server API: http://localhost:8080/api
+# Client UI:  http://localhost:8081
+```
+
+### Workspace Path Mapping
+
+Docker 中 user 輸入的是 host path（如 `/home/ubuntu/myproject`），但 container 內掛載在 `/workspace/myproject`。`manager.ts` 中的 `mapHostPathToContainer()` 自動做轉換：
+
+```
+WORKSPACE_HOST_PATH=/home/ubuntu
+WORKSPACE_CONTAINER_PATH=/workspace
+
+使用者輸入: /home/ubuntu/myproject
+Container 看到: /workspace/myproject
+```
+
+## 環境變數
+
+```bash
+# .env.example
+NODE_ENV=development
+PORT=3000
+HOST=0.0.0.0
+
+# JWT
+JWT_SECRET=your-super-secret-jwt-key-at-least-32-chars
+JWT_EXPIRES_IN=7d
+
+# Claude Agent SDK（擇一）
+# CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...  # OAuth token (Max subscription)
+# ANTHROPIC_API_KEY=sk-ant-api-...          # API key (pay-per-use)
+CLAUDE_MODEL=claude-sonnet-4-20250514
+CLAUDE_PERMISSION_MODE=bypassPermissions    # default | acceptEdits | bypassPermissions
+
+# Database
+DATABASE_PATH=./data/vibe-remote.db
+
+# Workspace Path Mapping (Docker only)
+# WORKSPACE_HOST_PATH=/home/ubuntu
+# WORKSPACE_CONTAINER_PATH=/workspace
+
+# Push Notifications (optional)
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:your-email@example.com
+```
+
+## 測試
+
+```bash
+# Server tests (vitest)
+npm --prefix server run test        # Watch mode
+npm --prefix server run test:run    # Single run
+npm --prefix server run test:coverage
+
+# 現有測試:
+# - server/src/auth/jwt.test.ts
+# - server/src/ws/rate-limit.test.ts
+# - server/src/ws/tool-approval.test.ts
+```
+
+### 測試策略
 
 ```
 Server:
-  - Unit tests: vitest (or jest)
-  - 測試重點: tool validation, path sanitization, git ops mock
+  - Unit tests: vitest
+  - 測試重點: JWT, rate limiting, tool approval, path validation
 
 Client:
-  - Component tests: vitest + React Testing Library
-  - 測試重點: chat input, diff viewer, approve/reject flow
+  - 尚未設定測試框架
+  - 建議: vitest + React Testing Library
 
 E2E:
-  - Playwright (Phase 2+)
-  - 測試重點: 完整 flow — chat → diff → approve → commit
+  - 尚未設定
+  - 建議: Playwright (Phase 2+)
 ```
+
+## 主要依賴
+
+### Server
+
+| Package | 版本 | 用途 |
+|---------|------|------|
+| `@anthropic-ai/claude-agent-sdk` | ^0.2.45 | Claude Agent SDK |
+| `better-sqlite3` | ^11.7.0 | SQLite（同步 API） |
+| `express` | ^4.21.2 | HTTP server |
+| `express-ws` | ^5.0.2 | WebSocket support |
+| `simple-git` | ^3.27.0 | Git 操作 |
+| `jsonwebtoken` | ^9.0.2 | JWT 認證 |
+| `qrcode` | ^1.5.4 | QR code 產生 |
+| `web-push` | ^3.6.7 | Push notifications |
+| `zod` | ^4.3.6 | Schema validation |
+| `chokidar` | ^4.0.3 | File watch |
+| `node-pty` | ^1.0.0 | Terminal（Phase 2） |
+| `tsx` | ^4.19.2 | TypeScript execution（dev） |
+| `vitest` | ^4.0.18 | Test framework |
+
+### Client
+
+| Package | 版本 | 用途 |
+|---------|------|------|
+| `react` | ^18.3.1 | UI framework |
+| `react-dom` | ^18.3.1 | React DOM renderer |
+| `react-router-dom` | ^7.1.1 | Client routing |
+| `zustand` | ^5.0.11 | State management |
+| `clsx` | ^2.1.1 | Conditional class names |
+| `tailwindcss` | ^3.4.17 | CSS framework |
+| `vite` | ^6.0.7 | Build tool |
+| `vite-plugin-pwa` | ^0.21.1 | PWA support |

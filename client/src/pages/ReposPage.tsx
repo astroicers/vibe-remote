@@ -1,9 +1,10 @@
 // Repos/Workspaces Page - Manage workspaces and quick git actions
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useWorkspaceStore } from '../stores/workspace';
 import { AppLayout } from '../components/AppLayout';
 import { QuickActions } from '../components/actions/QuickActions';
+import { workspaces as workspacesApi, type ScannedRepo } from '../services/api';
 
 export function ReposPage() {
   const {
@@ -26,10 +27,44 @@ export function ReposPage() {
   const [newWorkspacePath, setNewWorkspacePath] = useState('');
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [scannedRepos, setScannedRepos] = useState<ScannedRepo[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+
+  const projectsPath = localStorage.getItem('settings_projects_path') || '';
+
+  const scanForRepos = useCallback(async () => {
+    if (!projectsPath) return;
+    setIsScanning(true);
+    setScanError(null);
+    try {
+      const repos = await workspacesApi.scan(projectsPath);
+      setScannedRepos(repos);
+    } catch (e) {
+      setScanError(e instanceof Error ? e.message : 'Scan failed');
+      setScannedRepos([]);
+    } finally {
+      setIsScanning(false);
+    }
+  }, [projectsPath]);
+
+  const handleAddFromScan = async (repo: ScannedRepo) => {
+    await registerWorkspace(repo.path, repo.name);
+    // Re-scan to update isRegistered status
+    await scanForRepos();
+  };
 
   useEffect(() => {
     loadWorkspaces();
   }, [loadWorkspaces]);
+
+  // Scan for repos when modal opens (if projects path is configured)
+  useEffect(() => {
+    if (showAddModal && projectsPath && !showManualInput) {
+      scanForRepos();
+    }
+  }, [showAddModal, projectsPath, showManualInput, scanForRepos]);
 
   // Load git status when workspace changes
   useEffect(() => {
@@ -199,49 +234,137 @@ export function ReposPage() {
       {/* Add Workspace Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setShowAddModal(false)} />
-          <div className="relative bg-bg-elevated rounded-2xl p-6 mx-4 w-full max-w-md">
+          <div className="absolute inset-0 bg-black/60" onClick={() => { setShowAddModal(false); setShowManualInput(false); }} />
+          <div className="relative bg-bg-elevated rounded-2xl p-6 mx-4 w-full max-w-md max-h-[80vh] flex flex-col">
             <h2 className="text-lg font-semibold text-text-primary mb-4">Add Workspace</h2>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Path *</label>
-                <input
-                  type="text"
-                  value={newWorkspacePath}
-                  onChange={(e) => setNewWorkspacePath(e.target.value)}
-                  placeholder="/home/user/projects/my-repo"
-                  className="w-full px-4 py-2.5 bg-bg-surface border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Name (optional)</label>
-                <input
-                  type="text"
-                  value={newWorkspaceName}
-                  onChange={(e) => setNewWorkspaceName(e.target.value)}
-                  placeholder="my-repo"
-                  className="w-full px-4 py-2.5 bg-bg-surface border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
-                />
-                <p className="mt-1 text-xs text-text-muted">If empty, will use folder name</p>
-              </div>
-            </div>
+            {/* Scanned repos list (when projects path is configured) */}
+            {projectsPath && !showManualInput ? (
+              <div className="flex-1 overflow-y-auto min-h-0 space-y-3">
+                {isScanning ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" />
+                    <span className="ml-3 text-sm text-text-muted">Scanning {projectsPath}...</span>
+                  </div>
+                ) : scanError ? (
+                  <div className="text-center py-6">
+                    <p className="text-sm text-danger mb-2">{scanError}</p>
+                    <button onClick={scanForRepos} className="text-sm text-accent hover:text-accent/80">
+                      Retry
+                    </button>
+                  </div>
+                ) : scannedRepos.length === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-sm text-text-muted mb-1">No git repos found in</p>
+                    <p className="text-xs text-text-muted">{projectsPath}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {scannedRepos.map((repo) => (
+                      <div
+                        key={repo.path}
+                        className={`flex items-center gap-3 p-3 rounded-xl ${
+                          repo.isRegistered ? 'bg-bg-secondary opacity-50' : 'bg-bg-secondary hover:bg-bg-tertiary'
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-bg-tertiary flex items-center justify-center flex-shrink-0">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-text-secondary">
+                            <path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3V18a3 3 0 0 0 3 3h15ZM1.5 10.146V6a3 3 0 0 1 3-3h5.379a2.25 2.25 0 0 1 1.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 0 1 3 3v1.146A4.483 4.483 0 0 0 19.5 9h-15a4.483 4.483 0 0 0-3 1.146Z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-text-primary truncate">{repo.name}</p>
+                          <p className="text-xs text-text-muted truncate">{repo.path}</p>
+                        </div>
+                        {repo.isRegistered ? (
+                          <span className="text-xs text-text-muted px-2 py-1 bg-bg-tertiary rounded-lg flex-shrink-0">Added</span>
+                        ) : (
+                          <button
+                            onClick={() => handleAddFromScan(repo)}
+                            disabled={isLoading}
+                            className="px-3 py-1.5 bg-accent text-white rounded-lg text-xs font-medium hover:bg-accent/90 disabled:opacity-50 transition-colors flex-shrink-0"
+                          >
+                            Add
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="flex-1 py-2.5 bg-bg-tertiary text-text-secondary rounded-xl text-sm font-medium hover:bg-bg-surface transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddWorkspace}
-                disabled={!newWorkspacePath.trim() || isLoading}
-                className="flex-1 py-2.5 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 disabled:opacity-50 transition-colors"
-              >
-                {isLoading ? 'Adding...' : 'Add'}
-              </button>
-            </div>
+                {/* Manual input toggle */}
+                <button
+                  onClick={() => setShowManualInput(true)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                    <path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM12.75 9a.75.75 0 0 0-1.5 0v2.25H9a.75.75 0 0 0 0 1.5h2.25V15a.75.75 0 0 0 1.5 0v-2.25H15a.75.75 0 0 0 0-1.5h-2.25V9Z" clipRule="evenodd" />
+                  </svg>
+                  Enter path manually
+                </button>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => { setShowAddModal(false); setShowManualInput(false); }}
+                    className="flex-1 py-2.5 bg-bg-tertiary text-text-secondary rounded-xl text-sm font-medium hover:bg-bg-surface transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Manual path input */
+              <div className="space-y-4">
+                {projectsPath && (
+                  <button
+                    onClick={() => setShowManualInput(false)}
+                    className="flex items-center gap-1.5 text-sm text-accent hover:text-accent/80"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                      <path fillRule="evenodd" d="M7.72 12.53a.75.75 0 0 1 0-1.06l7.5-7.5a.75.75 0 1 1 1.06 1.06L9.31 12l6.97 6.97a.75.75 0 1 1-1.06 1.06l-7.5-7.5Z" clipRule="evenodd" />
+                    </svg>
+                    Back to discovered repos
+                  </button>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5">Path *</label>
+                  <input
+                    type="text"
+                    value={newWorkspacePath}
+                    onChange={(e) => setNewWorkspacePath(e.target.value)}
+                    placeholder="/home/user/projects/my-repo"
+                    className="w-full px-4 py-2.5 bg-bg-surface border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1.5">Name (optional)</label>
+                  <input
+                    type="text"
+                    value={newWorkspaceName}
+                    onChange={(e) => setNewWorkspaceName(e.target.value)}
+                    placeholder="my-repo"
+                    className="w-full px-4 py-2.5 bg-bg-surface border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+                  />
+                  <p className="mt-1 text-xs text-text-muted">If empty, will use folder name</p>
+                </div>
+
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => { setShowAddModal(false); setShowManualInput(false); }}
+                    className="flex-1 py-2.5 bg-bg-tertiary text-text-secondary rounded-xl text-sm font-medium hover:bg-bg-surface transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddWorkspace}
+                    disabled={!newWorkspacePath.trim() || isLoading}
+                    className="flex-1 py-2.5 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 disabled:opacity-50 transition-colors"
+                  >
+                    {isLoading ? 'Adding...' : 'Add'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

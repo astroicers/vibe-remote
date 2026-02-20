@@ -79,6 +79,13 @@ export interface Workspace {
   createdAt: string;
 }
 
+export interface ScannedRepo {
+  name: string;
+  path: string;
+  hasGit: boolean;
+  isRegistered: boolean;
+}
+
 export const workspaces = {
   list: () => request<Workspace[]>('/workspaces'),
 
@@ -86,6 +93,9 @@ export const workspaces = {
 
   register: (data: { path: string; name?: string }) =>
     request<Workspace>('/workspaces', { method: 'POST', json: data }),
+
+  scan: (dirPath: string) =>
+    request<ScannedRepo[]>(`/workspaces/scan?path=${encodeURIComponent(dirPath)}`),
 
   getFiles: (id: string, depth = 3) =>
     request<FileNode>(`/workspaces/${id}/files?depth=${depth}`),

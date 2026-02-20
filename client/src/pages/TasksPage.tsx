@@ -1,33 +1,13 @@
 // Tasks Page - Kanban-style task management
 
-import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '../components/AppLayout';
 
 export function TasksPage() {
-  const navigate = useNavigate();
-
   return (
     <AppLayout>
       {/* Header */}
       <header className="flex items-center px-4 h-14 border-b border-border bg-bg-secondary flex-shrink-0">
-        <button
-          onClick={() => navigate('/')}
-          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-bg-tertiary"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-text-secondary">
-            <path fillRule="evenodd" d="M7.72 12.53a.75.75 0 0 1 0-1.06l7.5-7.5a.75.75 0 1 1 1.06 1.06L9.31 12l6.97 6.97a.75.75 0 1 1-1.06 1.06l-7.5-7.5Z" clipRule="evenodd" />
-          </svg>
-        </button>
-
-        <div className="flex-1 ml-3">
-          <h1 className="text-base font-medium text-text-primary">Tasks</h1>
-        </div>
-
-        <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-bg-tertiary">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-text-secondary">
-            <path fillRule="evenodd" d="M12 3.75a.75.75 0 0 1 .75.75v6.75h6.75a.75.75 0 0 1 0 1.5h-6.75v6.75a.75.75 0 0 1-1.5 0v-6.75H4.5a.75.75 0 0 1 0-1.5h6.75V4.5a.75.75 0 0 1 .75-.75Z" clipRule="evenodd" />
-          </svg>
-        </button>
+        <h1 className="text-base font-medium text-text-primary">Tasks</h1>
       </header>
 
       {/* Kanban Board */}

@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { readdirSync, existsSync } from 'fs';
+import { join } from 'path';
 import { authMiddleware } from '../auth/middleware.js';
+import { config } from '../config.js';
 import {
   listWorkspaces,
   getWorkspace,
@@ -47,6 +50,90 @@ router.get('/active', (_req, res) => {
   }
 
   res.json(workspace);
+});
+
+// Scan a directory for git repositories (immediate subdirectories with .git)
+router.get('/scan', (req, res) => {
+  const scanPath = req.query.path as string | undefined;
+  if (!scanPath) {
+    res.status(400).json({
+      error: 'path query parameter is required',
+      code: 'MISSING_PATH',
+    });
+    return;
+  }
+
+  // Map host path to container path if running in Docker
+  let resolvedPath = scanPath;
+  const hostPath = config.WORKSPACE_HOST_PATH;
+  if (hostPath) {
+    const containerPath = config.WORKSPACE_CONTAINER_PATH;
+    const normalizedHost = hostPath.replace(/\/+$/, '');
+    const normalizedContainer = containerPath.replace(/\/+$/, '');
+    const normalizedInput = scanPath.replace(/\/+$/, '');
+    if (normalizedInput === normalizedHost || normalizedInput.startsWith(normalizedHost + '/')) {
+      resolvedPath = normalizedInput.replace(normalizedHost, normalizedContainer);
+    }
+  }
+
+  if (!existsSync(resolvedPath)) {
+    res.status(404).json({
+      error: `Path does not exist: ${scanPath}`,
+      code: 'PATH_NOT_FOUND',
+    });
+    return;
+  }
+
+  try {
+    const entries = readdirSync(resolvedPath, { withFileTypes: true });
+    const repos: Array<{ name: string; path: string; hasGit: boolean }> = [];
+
+    // Get already registered workspace paths
+    const registered = new Set(listWorkspaces().map((w) => w.path));
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      // Skip hidden directories
+      if (entry.name.startsWith('.')) continue;
+
+      const fullPath = join(resolvedPath, entry.name);
+      const gitPath = join(fullPath, '.git');
+      const hasGit = existsSync(gitPath);
+
+      if (hasGit) {
+        repos.push({
+          name: entry.name,
+          // Return the host path (not container path) so client can display what user expects
+          path: hostPath
+            ? fullPath.replace(config.WORKSPACE_CONTAINER_PATH.replace(/\/+$/, ''), hostPath.replace(/\/+$/, ''))
+            : fullPath,
+          hasGit: true,
+        });
+      }
+    }
+
+    // Sort alphabetically
+    repos.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Mark which ones are already registered
+    const result = repos.map((repo) => {
+      // Check both host and container paths
+      const containerPathForRepo = hostPath
+        ? repo.path.replace(hostPath.replace(/\/+$/, ''), config.WORKSPACE_CONTAINER_PATH.replace(/\/+$/, ''))
+        : repo.path;
+      return {
+        ...repo,
+        isRegistered: registered.has(repo.path) || registered.has(containerPathForRepo),
+      };
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to scan directory',
+      code: 'SCAN_ERROR',
+    });
+  }
 });
 
 // Get workspace by ID

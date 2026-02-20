@@ -7,18 +7,22 @@ Vibe Remote 是一個個人/小團隊工具，部署在 Tailscale 網路內。�
 | 威脅 | 嚴重度 | 緩解措施 |
 |------|--------|---------|
 | 未授權存取 server | 高 | Tailscale + JWT + device binding |
-| AI 執行惡意指令 | 高 | Tool 白名單 + workspace sandbox |
+| AI 執行惡意指令 | 高 | Claude Agent SDK 權限模式 + workspace cwd 限制 |
 | API key 外洩 | 高 | .env 不入 git + 環境變數注入 |
 | Session 劫持 | 中 | JWT 短效期 + refresh token rotation |
-| Workspace 路徑穿越 | 高 | 所有 file ops 驗證路徑在 workspace 內 |
+| Workspace 路徑穿越 | 高 | SDK 限制 file ops 在 cwd 內 + Docker volume mount 限制 |
 | Git force push 資料遺失 | 中 | Force push 需二次確認 + 禁用白名單 |
 
 ## 網路層：Tailscale
 
 ```
-Internet ──X──→ Server (port 3000 不對外開放)
+開發環境:
+Internet ──X──→ Server (localhost:3000) + Client (localhost:5173 via Vite)
+
+Docker 環境:
+Internet ──X──→ Server (port 8080) + Client (port 8081)
                     │
-Tailscale Network ──→ Server (100.x.y.z:3000 ✓)
+Tailscale Network ──→ Server (100.x.y.z:8080 ✓)
                     │
                     ├── 手機 (Tailscale app)
                     └── 電腦 (Tailscale daemon)
@@ -29,19 +33,31 @@ Tailscale Network ──→ Server (100.x.y.z:3000 ✓)
 - WireGuard 加密所有流量
 - Tailscale ACL 可進一步限制哪些裝置能連
 
+### Port 配置
+
+| 環境 | Server | Client | 說明 |
+|------|--------|--------|------|
+| 開發 (dev) | localhost:3000 | localhost:5173 | Vite dev server 代理 API |
+| Docker | 8080 (host) → 8080 (container) | 8081 (host) → 5173 (container) | docker-compose 設定 |
+
 ### Server 綁定設定
 
 ```typescript
-// server 只監聽 Tailscale IP 或 0.0.0.0 (由 Tailscale firewall 保護)
+// server/src/config.ts — 實際實作
 const HOST = process.env.HOST || '0.0.0.0';
-const PORT = parseInt(process.env.PORT || '3000');
-
-// CORS 設定：只允許 Tailscale IP 範圍
-const CORS_ORIGINS = [
-  /^https?:\/\/100\.\d+\.\d+\.\d+/,  // Tailscale IPv4
-  'http://localhost:5173',               // 開發用
-];
+const PORT = parseInt(process.env.PORT || '3000'); // Docker 環境設為 8080
 ```
+
+### CORS 設定
+
+目前 CORS 為開放模式（`cors()` 無參數），因為在 Tailscale 網路內：
+
+```typescript
+// server/src/index.ts — 實際實作
+app.use(cors());
+```
+
+> **注意**: 未來可考慮限制 CORS origin 到 Tailscale IP 範圍。目前安全性由 Tailscale 網路層保障。
 
 ## 認證層：JWT + QR Code Pairing
 
@@ -155,133 +171,130 @@ const DANGEROUS_OPERATIONS = [
 
 ## AI 安全
 
-### Tool Execution Sandbox
+### Claude Agent SDK 整合
+
+Vibe Remote 使用 `@anthropic-ai/claude-agent-sdk` 驅動 AI 操作，**不使用自定義 tool 定義**。SDK 提供內建工具：
+
+| 內建工具 | 類型 | 說明 |
+|----------|------|------|
+| Read | 唯讀 | 讀取檔案內容 |
+| Write | 寫入 | 建立或覆寫檔案 |
+| Edit | 寫入 | 精確字串替換 |
+| Bash | 執行 | 執行 shell 指令 |
+| Grep | 唯讀 | 搜尋檔案內容 |
+| Glob | 唯讀 | 依模式搜尋檔案名稱 |
+
+### 權限模式
+
+SDK 支援三種權限模式，透過 `CLAUDE_PERMISSION_MODE` 環境變數設定：
 
 ```
-所有 AI tool 操作限制在 workspace 目錄內：
+bypassPermissions (預設):
+  - AI 可自由使用所有工具，無需人工確認
+  - 適合個人開發環境 / Tailscale 保護下的使用場景
+  - 需額外設定 allowDangerouslySkipPermissions: true
 
-允許:
-  ✓ /home/user/projects/merak-platform/**
-  ✓ /home/user/projects/merak-platform/src/anything.ts
+acceptEdits:
+  - 讀取操作自動允許
+  - 寫入操作需要使用者確認
 
-禁止:
-  ✗ /home/user/.ssh/id_rsa
-  ✗ /etc/passwd
-  ✗ ../../../etc/shadow
-  ✗ /home/user/projects/other-project/  (不同 workspace)
+default:
+  - 所有工具使用都需要使用者確認
 ```
 
-### 路徑驗證
+實際實作 (`server/src/ai/claude-sdk.ts`)：
 
 ```typescript
-function validatePath(workspacePath: string, requestedPath: string): string {
-  // 1. Resolve to absolute path
-  const absolute = path.resolve(workspacePath, requestedPath);
-  
-  // 2. 確保在 workspace 內
-  if (!absolute.startsWith(workspacePath + path.sep) && absolute !== workspacePath) {
-    throw new ForbiddenError('Path traversal detected');
-  }
-  
-  // 3. 檢查是否在 blocklist 中
-  const blocked = ['.git', '.env', '.env.local', '.env.production'];
-  const relative = path.relative(workspacePath, absolute);
-  for (const pattern of blocked) {
-    if (relative === pattern || relative.startsWith(pattern + path.sep)) {
-      throw new ForbiddenError(`Access to ${pattern} is not allowed`);
-    }
-  }
-  
-  return absolute;
+if (options.permissionMode === 'bypassPermissions') {
+  sdkOptions.permissionMode = 'bypassPermissions';
+  sdkOptions.allowDangerouslySkipPermissions = true;
+} else if (options.permissionMode === 'acceptEdits') {
+  sdkOptions.permissionMode = 'acceptEdits';
 }
 ```
 
-### Terminal 指令白名單
+### Tool Approval System（非 bypass 模式）
+
+當權限模式不是 `bypassPermissions` 時，`server/src/ws/tool-approval.ts` 提供 Promise-based 的審批機制：
+
+```
+流程:
+1. SDK 要求執行某個工具
+2. Server 透過 WebSocket 發送 tool_approval_request 到 Client
+3. Client 顯示審批 UI（工具名稱、輸入參數、風險等級）
+4. 使用者選擇 Approve / Reject
+5. Client 發送 tool_approval_response 回 Server
+6. Server resolve/reject Promise，SDK 繼續或中止
+
+超時: 120 秒（超時自動 reject）
+自動核准: 唯讀工具（Read, Glob, Grep）可設定自動核准
+```
+
+### Workspace 路徑限制
+
+SDK 的 `cwd` 選項限制 AI 操作在 workspace 目錄內：
 
 ```typescript
-const ALLOWED_COMMAND_PREFIXES = [
-  'npm ', 'npx ', 'node ', 'yarn ', 'pnpm ',
-  'cat ', 'head ', 'tail ', 'grep ', 'find ', 'ls', 'wc ',
-  'git status', 'git diff', 'git log', 'git branch', 'git show',
-  'tsc', 'eslint', 'prettier',
-  'echo ', 'pwd',
-];
-
-const BLOCKED_PATTERNS = [
-  /rm\s+(-[rf]+\s+)?[\/~]/, // rm -rf / or ~
-  /sudo/,
-  /su\s/,
-  /chmod\s+777/,
-  /curl\s/,
-  /wget\s/,
-  /docker\s/,
-  /kubectl\s/,
-  />\s*\//, // redirect to root paths
-  /\|\s*(bash|sh|zsh)/, // pipe to shell
-];
-
-function validateCommand(command: string): boolean {
-  // 1. 檢查白名單
-  const isAllowed = ALLOWED_COMMAND_PREFIXES.some(
-    prefix => command.startsWith(prefix)
-  );
-  if (!isAllowed) return false;
-  
-  // 2. 檢查黑名單
-  const isBlocked = BLOCKED_PATTERNS.some(
-    pattern => pattern.test(command)
-  );
-  if (isBlocked) return false;
-  
-  return true;
-}
+const sdkOptions: Options = {
+  cwd: options.workspacePath,  // AI 操作限制在此目錄
+  // ...
+};
 ```
+
+> **注意**: 本專案**不實作**自定義的路徑驗證函式。路徑安全性完全由 Claude Agent SDK 內部管理，結合 Docker volume mount 的邊界限制。
+
+### Terminal 指令安全
+
+> **Phase 2 / 尚未實作**: `server/src/terminal/` 目錄目前為空。沒有自定義的指令白名單或黑名單。
+>
+> 目前所有 shell 指令執行都透過 Claude Agent SDK 的內建 `Bash` 工具，其行為受上述權限模式控制。在 `bypassPermissions` 模式下，AI 可自由執行任何 shell 指令。
 
 ## API 安全
 
 ### Rate Limiting
 
+Rate limiting 在 WebSocket 層實作，**不使用** `express-rate-limit` middleware。沒有 REST endpoint 專屬的 rate limit。
+
+實作位於 `server/src/ws/rate-limit.ts` 和 `server/src/ws/chat-handler.ts`：
+
 ```typescript
-// 全域 rate limit
-app.use(rateLimit({
-  windowMs: 60 * 1000,  // 1 分鐘
-  max: 120,              // 最多 120 requests/min
-  keyGenerator: (req) => req.deviceId, // per-device
-}));
+// server/src/ws/chat-handler.ts — 實際實作
+const RATE_LIMIT_WINDOW = 60000; // 1 分鐘
+const RATE_LIMIT_MAX = 10;       // 每裝置 10 則訊息/分鐘
 
-// AI chat rate limit (更嚴格)
-app.use('/api/chat/send', rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,               // 最多 10 次 AI 呼叫/min
-  keyGenerator: (req) => req.deviceId,
-}));
+// 以 deviceId 為 key 的 in-memory Map<string, number[]>
+const rateLimitMap = new Map<string, number[]>();
 
-// Git 操作 rate limit
-app.use('/api/git', rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  keyGenerator: (req) => req.deviceId,
-}));
+function checkRateLimit(deviceId: string): boolean {
+  const now = Date.now();
+  const timestamps = rateLimitMap.get(deviceId) || [];
+  const recentTimestamps = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW);
+
+  if (recentTimestamps.length >= RATE_LIMIT_MAX) {
+    return false;
+  }
+
+  recentTimestamps.push(now);
+  rateLimitMap.set(deviceId, recentTimestamps);
+  return true;
+}
 ```
+
+此外，`server/src/ws/rate-limit.ts` 提供可重用的 `RateLimitStore` class，支援：
+- `checkLimit(key)` — 檢查是否超限
+- `getRemainingRequests(key)` — 剩餘配額
+- `getTimeUntilReset(key)` — 等待重置時間
+- 可動態調整 `windowMs` 和 `maxRequests`
+
+另有並行限制（`chat-handler.ts`）：
+- `MAX_CONCURRENT_RUNNERS = 3` — 全域最多 3 個同時執行的 Claude SDK 查詢
+- 每個 conversation 同一時間只能有一個 runner
 
 ### Security Headers
 
-```typescript
-import helmet from 'helmet';
-
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],  // Tailwind needs inline styles
-      connectSrc: ["'self'", "wss:"],           // WebSocket
-      imgSrc: ["'self'", "data:"],              // QR code
-    }
-  },
-  hsts: { maxAge: 31536000 },
-}));
-```
+> **尚未實作**: `helmet` middleware 目前未安裝也未使用。Server 只使用 `cors()` 和 `express.json()` middleware。
+>
+> 未來可考慮加入 helmet 設定 CSP、HSTS 等安全標頭。目前安全性主要依賴 Tailscale 網路層保護。
 
 ### Input Validation
 

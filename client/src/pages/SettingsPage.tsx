@@ -1,7 +1,6 @@
 // Settings Page - App configuration and preferences
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { AppLayout } from '../components/AppLayout';
 
@@ -62,10 +61,22 @@ function Toggle({
 }
 
 export function SettingsPage() {
-  const navigate = useNavigate();
   const [model, setModel] = useState<'sonnet' | 'opus'>('sonnet');
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [autoCommitMsg, setAutoCommitMsg] = useState(true);
+  const [projectsPath, setProjectsPath] = useState(() => localStorage.getItem('settings_projects_path') || '');
+  const [projectsPathSaved, setProjectsPathSaved] = useState(false);
+
+  const handleSaveProjectsPath = () => {
+    const trimmed = projectsPath.trim();
+    if (trimmed) {
+      localStorage.setItem('settings_projects_path', trimmed);
+    } else {
+      localStorage.removeItem('settings_projects_path');
+    }
+    setProjectsPathSaved(true);
+    setTimeout(() => setProjectsPathSaved(false), 2000);
+  };
 
   // Push notifications
   const {
@@ -90,21 +101,41 @@ export function SettingsPage() {
     <AppLayout>
       {/* Header */}
       <header className="flex items-center px-4 h-14 border-b border-border bg-bg-secondary flex-shrink-0">
-        <button
-          onClick={() => navigate(-1)}
-          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-bg-tertiary"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-text-secondary">
-            <path fillRule="evenodd" d="M7.72 12.53a.75.75 0 0 1 0-1.06l7.5-7.5a.75.75 0 1 1 1.06 1.06L9.31 12l6.97 6.97a.75.75 0 1 1-1.06 1.06l-7.5-7.5Z" clipRule="evenodd" />
-          </svg>
-        </button>
-        <div className="flex-1 ml-3">
-          <h1 className="text-base font-medium text-text-primary">Settings</h1>
-        </div>
+        <h1 className="text-base font-medium text-text-primary">Settings</h1>
       </header>
 
       {/* Content */}
       <main className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+        {/* Workspace Section */}
+        <section>
+          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Workspace</h2>
+          <div className="p-4 bg-bg-secondary rounded-xl space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-1">Projects Path</label>
+              <p className="text-xs text-text-muted mb-2">Root directory containing your git repos. Used for auto-discovery when adding workspaces.</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={projectsPath}
+                  onChange={(e) => { setProjectsPath(e.target.value); setProjectsPathSaved(false); }}
+                  placeholder="/home/ubuntu"
+                  className="flex-1 px-3 py-2 bg-bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+                />
+                <button
+                  onClick={handleSaveProjectsPath}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    projectsPathSaved
+                      ? 'bg-success/20 text-success'
+                      : 'bg-accent text-white hover:bg-accent/90'
+                  }`}
+                >
+                  {projectsPathSaved ? 'Saved' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* AI Section */}
         <section>
           <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">AI Model</h2>

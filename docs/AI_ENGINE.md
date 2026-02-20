@@ -3,411 +3,376 @@
 ## 總覽
 
 AI Engine 是 Vibe Remote 的核心，負責：
-1. 組裝 project context（讓 AI 理解你的 codebase）
-2. 管理對話歷史
-3. Streaming 回覆
-4. Tool use（讓 AI 讀寫檔案、執行指令）
-5. 產生 diff 供 review
+1. 透過 Claude Agent SDK 驅動 AI 完成 coding 任務
+2. 組裝 project context（讓 AI 理解你的 codebase）
+3. 管理對話歷史與 token 優化
+4. Streaming 回覆（透過 WebSocket 即時推送）
+5. 追蹤 modified files 並產生 diff 供 review
+6. 自動產生 commit message / PR description
 
-## Claude API 使用方式
+## Claude Agent SDK
 
-### Model 選擇
+### 為什麼用 Agent SDK 而非直接 Anthropic SDK
+
+Vibe Remote 使用 `@anthropic-ai/claude-agent-sdk` 而非直接的 `@anthropic-ai/sdk`。Agent SDK 封裝了 Claude Code 的完整能力，包含：
+
+- **內建 tools**：Read, Write, Edit, Bash, Grep, Glob 等，不需要自行定義
+- **Tool use loop**：SDK 自動處理多輪 tool call，直到任務完成
+- **CLAUDE.md 自動讀取**：設定 `cwd` 後，SDK 會自動讀取 workspace 中的 CLAUDE.md
+- **Permission modes**：支援 `default`、`acceptEdits`、`bypassPermissions` 三種權限模式
+
+### Authentication
+
+支援三種認證方式（擇一）：
+
+```
+1. CLAUDE_CODE_OAUTH_TOKEN — OAuth token（透過 `claude setup-token` 取得，使用 Max subscription）
+2. ANTHROPIC_API_KEY — API key（從 console.anthropic.com 取得，pay-per-use）
+3. Claude Code CLI login — 透過 `claude login` 登入
+```
+
+Module load 時會自動檢查認證狀態，缺少認證時輸出 warning。
+
+### Model 設定
 
 ```
 預設: claude-sonnet-4-20250514
-可選: claude-opus-4-20250514 (for complex tasks)
-
-建議讓使用者在 settings 或 per-workspace 設定中切換。
+可透過 CLAUDE_MODEL 環境變數覆蓋（config.ts 中定義）
 ```
 
-### API 呼叫模式
+### SDK 呼叫方式
 
-使用 Anthropic SDK 的 streaming mode：
+使用 `query()` 函式建立 async iterable，搭配 `AbortController` 支援取消：
 
 ```typescript
-// 概念範例，非實際 code
-const stream = await anthropic.messages.stream({
-  model: 'claude-sonnet-4-20250514',
-  max_tokens: 8192,
-  system: systemPrompt,       // context builder 組裝
-  messages: conversationHistory,
-  tools: toolDefinitions,     // file_read, file_write, etc.
-});
+import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
 
-for await (const event of stream) {
-  // 每個 chunk 透過 WebSocket 即時送到 client
-  ws.send(JSON.stringify({
-    event: 'ai_chunk',
-    data: { type: event.type, content: event.content }
-  }));
+const sdkOptions: Options = {
+  model: config.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
+  cwd: workspacePath,         // SDK 自動讀取此目錄下的 CLAUDE.md
+  maxTurns: 20,               // Tool use loop 最大輪數
+  abortController,            // 支援中途取消
+  includePartialMessages: true, // 啟用 streaming delta
+  permissionMode: 'bypassPermissions',
+  allowDangerouslySkipPermissions: true,
+};
+
+for await (const message of query({ prompt, options: sdkOptions })) {
+  // message types: 'assistant' | 'stream_event' | 'result' | 'system'
 }
 ```
 
-### Tool Use Loop
+## ClaudeSdkRunner
 
-Claude 可能在一次回覆中使用多個 tools。流程：
+`ClaudeSdkRunner` 繼承 `EventEmitter`，封裝了 SDK 呼叫邏輯。
+
+### 介面
+
+```typescript
+interface ClaudeSdkOptions {
+  workspacePath: string;
+  permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions';
+  maxTurns?: number;
+  systemPrompt?: string;
+  resumeSessionId?: string;  // Session resume（目前 disabled）
+}
+
+interface ChatResponse {
+  fullText: string;
+  modifiedFiles: string[];   // 去重後的被修改檔案列表
+  tokenUsage?: TokenUsage;
+  sessionId?: string;
+}
+
+interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  costUsd: number;
+}
+```
+
+### 方法
+
+| 方法 | 說明 |
+|------|------|
+| `run(prompt, options)` | 執行 AI 查詢，回傳 `Promise<ChatResponse>` |
+| `abort()` | 中止當前查詢（呼叫 `AbortController.abort()` + `queryInstance.close()`） |
+
+### Events
+
+Runner 透過 `event` 事件發射 `StreamEvent`：
+
+| Event Type | 說明 | 附帶資料 |
+|------------|------|----------|
+| `text` | AI 文字回覆（streaming chunks） | `content: string` |
+| `tool_use` | AI 呼叫了某個 tool | `toolName: string, toolInput: unknown` |
+| `tool_result` | Tool 執行結果 | `toolResult: unknown` |
+| `token_usage` | Token 使用統計 | `tokenUsage: TokenUsage` |
+| `error` | 錯誤 | `content: string` |
+| `done` | 查詢完成 | — |
+
+### Message 處理邏輯
+
+SDK 回傳的 message types 與處理方式：
 
 ```
-1. 送出 messages + tools → Claude API
-2. Claude 回覆可能包含:
-   a. text → streaming 送到 client
-   b. tool_use → 執行 tool → 將 result 加入 messages
-3. 如果有 tool_use，重複步驟 1（帶上 tool results）
-4. 直到 Claude 只回覆 text（stop_reason: end_turn）
-5. 儲存完整對話到 SQLite
+assistant     → 遍歷 content blocks:
+                - text block → 發射 text event，累積 fullText
+                - tool_use block → 發射 tool_use event
+                  - 如果是 Write 或 Edit tool → 追蹤 file_path 到 modifiedFiles
+stream_event  → 處理 content_block_delta:
+                - text_delta → 發射 text event（streaming chunk）
+result        → 解析 token usage（input/output/cache tokens + cost USD）
+                - subtype !== 'success' → 發射 error event
+system        → 包含 session info、tools list（目前僅 log）
+```
+
+### System Prompt 傳遞
+
+透過 SDK 的 `extraArgs` 傳遞 system prompt：
+
+```typescript
+if (options.systemPrompt) {
+  sdkOptions.extraArgs = {
+    'system-prompt': options.systemPrompt,
+  };
+}
+```
+
+## Parallel Runners（並行執行管理）
+
+chat-handler.ts 管理多個同時運行的 AI 查詢：
+
+```typescript
+interface RunnerState {
+  runner: ClaudeSdkRunner;
+  workspaceId: string;
+  conversationId: string;
+}
+
+const activeRunners = new Map<string, RunnerState>();
+const MAX_CONCURRENT_RUNNERS = 3;
+```
+
+### Key 結構
+
+Runner 以 `workspaceId:conversationId` 為 key，確保：
+- 同一個 conversation 不會有兩個並行的 AI 查詢
+- 全域最多 3 個並行 runner（超過時拒絕新請求）
+
+### 生命週期
+
+```
+1. chat_send 進來 → 檢查 per-conversation lock
+2. 檢查全域並行數（< MAX_CONCURRENT_RUNNERS）
+3. 建立 ClaudeSdkRunner → 註冊到 activeRunners
+4. runner.run() → 處理 streaming events → 透過 WebSocket 推送
+5. 完成或錯誤 → 從 activeRunners 移除（在 finally block）
+6. WebSocket 斷線 → abort 所有 runners → clear map
 ```
 
 ## Context Builder
+
+### 函式呼叫鏈
+
+```
+buildFullSystemPrompt(workspacePath, workspaceSystemPrompt?, selectedFiles?)
+  └── buildProjectContext(workspacePath, workspaceSystemPrompt?)
+       ├── getFileTree(workspacePath, { maxDepth: 2 })
+       ├── 讀取 KEY_FILE_PATTERNS
+       ├── getGitStatus(workspacePath)
+       └── getRecentCommits(workspacePath, 3)
+  └── buildSystemPrompt(context: ProjectContext)
+       └── 組裝各 section 為 string
+  └── 附加 selectedFiles 內容
+```
+
+### Context 限制（Token 效率優化）
+
+```typescript
+const KEY_FILE_PATTERNS = [
+  'package.json',     // 只保留 name, version, scripts, dependencies 的 key list
+  'tsconfig.json',
+  '.env.example',
+];
+
+const CONTEXT_LIMITS = {
+  maxFileChars: 10000,    // 每個 key file 最大 ~2500 tokens
+  fileTreeDepth: 2,       // 目錄結構只展到第 2 層
+  recentCommits: 3,       // 最近 3 個 commit
+};
+```
 
 ### System Prompt 結構
 
 ```
 [Base System Prompt]
   你是一個 coding assistant，在 Vibe Remote 環境中工作...
+  - 環境說明（有 file system tools、user 在手機上）
+  - 工作流程（理解需求 → 讀檔 → 改檔 → 摘要）
+  - 指引（遵循 code style、error handling、簡潔回覆）
 
-[Workspace System Prompt] (if configured)
-  This is a zero-trust platform project using OpenZiti...
+[Workspace Instructions] (if configured)
+  Workspace-level system prompt（per-workspace 設定）
 
-[Project Context]
-  ## Project Structure
-  (file tree, filtered by .gitignore, max depth 3)
-  
-  ## Key Files
-  package.json content
-  tsconfig.json content
-  
-  ## Git Status
-  Current branch: feat/rate-limiting
-  Uncommitted changes: 3 files
-  Recent commits (last 5):
-    - abc1234: feat: add rate limiting config
-    - def5678: fix: database connection leak
-    ...
+[Project Structure]
+  File tree（depth 2，respect .gitignore）
 
-[User-Selected File Contents]
-  ## src/index.ts
-  (file content)
-  
-  ## src/middleware/auth.ts  
-  (file content)
+[Key Files]
+  package.json（summarized: name, version, scripts, dep names only）
+  tsconfig.json
+  .env.example
+
+[Git Status]
+  Current branch
+  Staged/unstaged/untracked counts
+  Recent 3 commits（hash:message）
+
+[User-Selected Files] (optional)
+  各檔案內容（truncated to 10000 chars）
 ```
 
-### Base System Prompt
+### package.json 摘要
 
-```markdown
-You are a coding assistant working within the Vibe Remote environment. You help engineers write, modify, and debug code through natural language conversation.
+為減少 token 使用，`summarizePackageJson()` 只保留：
+- `name`, `version`, `description`, `scripts`
+- `dependencies` → 只留 key names（去掉版本號）
+- `devDependencies` → 只留 key names
 
-## Environment
-- You have access to the project's file system through tools
-- The user is on a mobile device and communicates via text or voice
-- Keep responses concise and focused — the user is reading on a small screen
-- When making changes, explain WHAT you changed and WHY, briefly
+### File Tree 格式
 
-## Workflow
-1. Understand the user's request
-2. Read relevant files using file_read tool if needed
-3. Make changes using file_write or file_edit tools
-4. Summarize what you did
-5. The user will review your changes as a diff
+使用 tree-style 格式，每個目錄最多顯示 50 個子項目，超過顯示 `... and N more`。
 
-## Guidelines
-- Always read existing code before modifying it
-- Follow the project's existing code style and patterns
-- Add error handling for edge cases
-- Write clear commit messages when asked
-- If the task is ambiguous, ask for clarification rather than guessing
-- Keep your explanations brief and mobile-friendly
-- Use code blocks with language tags for any code you show
+## Token 優化策略
+
+### History Truncation
+
+當 session resume 不可用時（目前預設），對話歷史以 inline 方式附加到 prompt：
+
+```typescript
+// truncate.ts 定義的限制
+const LIMITS = {
+  messageContent: 2000,   // 每則訊息最大 2000 字元
+  historyCount: 5,        // 最多保留最近 5 則訊息
+  textFileSize: 1 * 1024 * 1024,  // 文字檔最大 1MB
+  attachmentSize: 20 * 1024 * 1024,
+  codeBlockSize: 1900,
+};
 ```
 
-### Project Context 組裝邏輯
-
+歷史訊息格式：
 ```
-getProjectContext(workspaceId):
-  1. 讀取 workspace path
-  2. 用 file-tree 模組產生目錄結構
-     - respect .gitignore
-     - max depth: 3
-     - exclude: node_modules, .git, dist, build, coverage, __pycache__
-     - 如果超過 200 個項目，truncate + 顯示 "(... and N more)"
-  3. 讀取 key config files:
-     - package.json (name, scripts, dependencies 部分)
-     - tsconfig.json
-     - .env.example (如果有)
-     - Dockerfile (如果有)
-  4. git status:
-     - current branch
-     - uncommitted files list
-     - ahead/behind remote
-  5. git log --oneline -5 (最近 5 個 commit)
-  6. 如果有 system_prompt → 附加
-  
-  回傳組裝好的 string
+Recent conversation:
+user: [truncated message]
+assistant: [truncated message]
+...
 ```
 
-### Token 預算管理
+Tool interaction 的 content（ContentBlock[]）顯示為 `[tool interaction]`。
 
+### File Size 檢查
+
+`checkFileSize()` 在讀取 user-selected files 前檢查：
+- Text files: ≤ 1MB
+- Non-text files: ≤ 20MB
+- 超過限制的檔案會被跳過，並透過 `files_skipped` WebSocket event 通知 client
+
+### Context Builder 限制
+
+- Key files: 每個最大 10000 字元（truncateText 截斷加 `...`）
+- File tree depth: 2
+- Recent commits: 3
+- package.json: summarized（只保留 names）
+
+### Session Resume（目前 Disabled）
+
+SDK 支援 `persistSession` / `resumeSessionId` 來跨請求復用 conversation context，但目前在 Docker 環境中因 session files 跨 process 不穩定而停用。Database 中的 `conversations.sdk_session_id` 欄位仍在寫入，但不用於 resume：
+
+```typescript
+// NOTE: Session resume disabled — SDK's persistSession/resume doesn't work
+// reliably in Docker (session files not found across spawned processes).
+// History is sent inline instead. Re-enable when SDK supports stable resume.
 ```
-Claude Sonnet context window: ~200K tokens
-目標 system prompt + context 控制在 30K tokens 以內
 
-分配:
-  - Base system prompt:     ~500 tokens
-  - Workspace system prompt: ~1,000 tokens (user configured)
-  - File tree:              ~2,000 tokens (depth 3, ignore patterns)
-  - Key config files:       ~3,000 tokens
-  - Git info:               ~500 tokens
-  - User-selected files:    ~15,000 tokens (cap per file: 5,000 tokens)
-  - Conversation history:   ~8,000 tokens (最近 20 輪，超過 truncate 早期)
-  
-  Total: ~30,000 tokens → 留 170K 給 AI 工作
-```
+## Tools（由 SDK 內建提供）
 
-如果 user-selected files 太大：
-1. 先嘗試只取前 200 行
-2. 如果還是太大，只取 file summary（imports + exports + function signatures）
-3. 通知 user file 被 truncated
+Claude Agent SDK 自帶完整的 tool set，**不需要自行定義 tool schema**。內建 tools 包含：
 
-## Tool Definitions
+| Tool | 說明 |
+|------|------|
+| `Read` | 讀取檔案內容 |
+| `Write` | 建立或覆寫檔案 |
+| `Edit` | 精確的 search & replace 編輯 |
+| `Bash` | 執行終端指令 |
+| `Grep` | 搜尋檔案內容（ripgrep） |
+| `Glob` | 檔案名稱 pattern matching |
 
-### file_read
-讀取檔案內容。
+這些 tools 由 SDK 自動管理 tool use loop（最多 `maxTurns` 輪），包含：
+- 自動讀取 CLAUDE.md 獲取 workspace 指引
+- Permission handling（根據 `permissionMode` 設定）
+- 錯誤自動修正（tool 失敗時 AI 會自動重試其他方式）
 
-```json
-{
-  "name": "file_read",
-  "description": "Read the contents of a file in the workspace",
-  "input_schema": {
-    "type": "object",
-    "properties": {
-      "path": {
-        "type": "string",
-        "description": "Relative path from workspace root, e.g. 'src/index.ts'"
-      }
-    },
-    "required": ["path"]
+### Modified Files 追蹤
+
+chat-handler 透過監聽 `tool_use` event 來追蹤被修改的檔案：
+
+```typescript
+if (block.name === 'Write' || block.name === 'Edit') {
+  const input = block.input as { file_path?: string };
+  if (input.file_path) {
+    modifiedFiles.push(input.file_path);
   }
 }
 ```
 
-**執行邏輯**:
-- 路徑必須在 workspace 目錄內（防止路徑穿越）
-- 如果檔案不存在 → return error
-- 如果是二進位檔 → return "(binary file, not shown)"
-- 如果超過 10,000 行 → truncate + 說明
-
-### file_write
-建立或覆寫整個檔案。
-
-```json
-{
-  "name": "file_write",
-  "description": "Create a new file or overwrite an existing file",
-  "input_schema": {
-    "type": "object",
-    "properties": {
-      "path": {
-        "type": "string",
-        "description": "Relative path from workspace root"
-      },
-      "content": {
-        "type": "string",
-        "description": "Complete file content to write"
-      }
-    },
-    "required": ["path", "content"]
-  }
-}
-```
-
-**執行邏輯**:
-- 路徑必須在 workspace 目錄內
-- 自動建立中間目錄（mkdir -p）
-- 寫入後記錄在 modified files list
-
-### file_edit
-精確編輯檔案（search & replace）。比 file_write 更精準，適合小改動。
-
-```json
-{
-  "name": "file_edit",
-  "description": "Make targeted edits to a file using search and replace",
-  "input_schema": {
-    "type": "object",
-    "properties": {
-      "path": {
-        "type": "string",
-        "description": "Relative path from workspace root"
-      },
-      "edits": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "search": {
-              "type": "string",
-              "description": "Exact text to find (must match uniquely)"
-            },
-            "replace": {
-              "type": "string",
-              "description": "Text to replace with"
-            }
-          },
-          "required": ["search", "replace"]
-        },
-        "description": "List of search-and-replace operations"
-      }
-    },
-    "required": ["path", "edits"]
-  }
-}
-```
-
-**執行邏輯**:
-- 每個 search string 必須在檔案中 exactly match 一次
-- 如果 match 0 次 → error "search text not found"
-- 如果 match > 1 次 → error "search text matches multiple locations, be more specific"
-- 按順序執行所有 edits
-
-### terminal_run
-執行終端指令（白名單制）。
-
-```json
-{
-  "name": "terminal_run",
-  "description": "Run a terminal command in the workspace directory",
-  "input_schema": {
-    "type": "object",
-    "properties": {
-      "command": {
-        "type": "string",
-        "description": "Shell command to execute"
-      }
-    },
-    "required": ["command"]
-  }
-}
-```
-
-**執行邏輯**:
-- Working directory 設為 workspace path
-- 超時限制：60 秒
-- 允許的指令前綴白名單：
-  ```
-  npm, npx, node, yarn, pnpm,
-  cat, head, tail, grep, find, ls, wc,
-  git status, git diff, git log, git branch,
-  tsc, eslint, prettier,
-  echo, pwd
-  ```
-- 禁止的指令：
-  ```
-  rm -rf, rm -r (outside workspace)
-  sudo, su, chmod 777,
-  curl, wget (防止 exfiltration)
-  docker, kubectl (防止影響到其他服務)
-  ```
-- Output 超過 5000 字元 → truncate 顯示頭尾
-
-### search_codebase
-搜尋 codebase（使用 ripgrep 或 grep）。
-
-```json
-{
-  "name": "search_codebase",
-  "description": "Search for text patterns across the codebase",
-  "input_schema": {
-    "type": "object",
-    "properties": {
-      "query": {
-        "type": "string",
-        "description": "Search pattern (literal string or regex)"
-      },
-      "file_pattern": {
-        "type": "string",
-        "description": "Optional file glob pattern, e.g. '*.ts'"
-      },
-      "max_results": {
-        "type": "integer",
-        "description": "Maximum number of results (default: 20)"
-      }
-    },
-    "required": ["query"]
-  }
-}
-```
-
-### git_diff
-查看當前 uncommitted changes。
-
-```json
-{
-  "name": "git_diff",
-  "description": "View the current uncommitted changes in the workspace",
-  "input_schema": {
-    "type": "object",
-    "properties": {
-      "file": {
-        "type": "string",
-        "description": "Optional: specific file to diff. If omitted, shows all changes."
-      }
-    }
-  }
-}
-```
+最終結果會去重（`new Set(modifiedFiles)`）。
 
 ## Diff 產生機制
 
-當 AI 透過 tool 修改檔案後：
+Diff 的產生由 chat-handler.ts 在 AI 查詢完成後觸發：
 
 ```
-1. AI tool call 修改了 file(s)
-2. tool-executor 記錄所有被修改的 file paths
-3. AI 回覆結束後（tool loop 結束）
-4. Server 執行 `git diff` 取得所有 unstaged changes
-5. 解析 diff → per-file breakdown:
-   - file path
-   - status (added / modified / deleted)
-   - hunks (change blocks)
-   - insertion/deletion counts
-6. 建立 diff_reviews records (status: pending)
-7. WebSocket push "diff_ready" event 到 client
-8. Client 跳轉到 Diff Review page（或顯示 badge）
+1. AI 透過 Write/Edit tools 修改了檔案
+2. ClaudeSdkRunner 追蹤所有 modified file paths（去重）
+3. runner.run() 完成 → 回傳 ChatResponse.modifiedFiles
+4. chat-handler 發送 chat_complete event（含 modifiedFiles 列表）
+5. 如果 modifiedFiles.length > 0 → 發送 diff_ready event
+6. Client 收到 diff_ready → 跳轉到 Diff Review page
 ```
 
-## 自動 Commit Message 產生
+Diff 內容本身由 client 端呼叫 REST API 取得（git diff）。
 
-當使用者選擇 auto commit message：
+## Commit Message 自動產生
 
+使用 `runSimplePrompt()` 執行非 streaming 的簡單查詢：
+
+```typescript
+async function runSimplePrompt(prompt: string, workspacePath: string): Promise<string> {
+  const sdkOptions: Options = {
+    model: config.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
+    cwd: workspacePath,
+    maxTurns: 1,         // 單輪，不使用 tools
+    tools: [],           // 明確禁用 tools
+    persistSession: false,
+  };
+  // ...iterate messages, collect text
+}
 ```
-System: "Based on the following git diff, generate a concise commit message 
-following Conventional Commits format (feat/fix/chore/docs/refactor/test).
-Include a brief body if the change is non-trivial.
 
-Diff:
-{full git diff output}
+### generateCommitMessage(diff, workspacePath)
 
-Rules:
-- First line: type(scope): description (max 72 chars)
-- Body: explain WHY, not WHAT (the diff shows WHAT)
-- Use imperative mood
-- Be specific about what changed"
-```
+Prompt 規則：
+- Conventional Commits format（feat/fix/chore/docs/refactor/test）
+- First line max 72 chars
+- Imperative mood
+- 只輸出 commit message，不附加其他說明
 
-## 自動 PR Description 產生
+### generatePRDescription(branchName, baseBranch, commits, diff, workspacePath)
 
-```
-System: "Generate a pull request description for the following changes.
-
-Branch: {branch_name}
-Base: {base_branch}
-Commits:
-{commit list}
-
-Full diff:
-{diff}
-
-Format:
+輸出格式：
+```markdown
 ## Summary
 (1-2 sentences)
 
@@ -415,33 +380,102 @@ Format:
 (bullet list of key changes)
 
 ## Testing
-(what was tested)"
+(what was tested)
 ```
 
 ## Rate Limiting
 
-- Claude API 有自己的 rate limit
-- Vibe Remote 額外限制：
-  - 每分鐘最多 10 次 chat send（防止使用者太快按送出）
-  - 每個 tool call 最多 60 秒超時
-  - 並行 AI 請求：最多 1 個（sequential processing）
-    - 如果已有請求在進行中，新請求排隊
-    - Phase 2 Task Queue 可以有多個 concurrent（每個在不同 branch）
+WebSocket 層級的 rate limiting，以 deviceId 為單位：
+
+```
+速率限制: 10 messages / minute / device
+視窗: 60 秒 sliding window
+實作: in-memory Map<deviceId, timestamp[]>
+```
+
+超過限制時回傳 `{ type: 'error', error: 'Rate limit exceeded.' }`。
+
+並行限制：
+- 每個 conversation 最多 1 個進行中的 AI 查詢
+- 全域最多 3 個並行 runner
 
 ## Error Handling
 
-```
-Claude API errors:
-  - 429 Too Many Requests → 等待 retry-after header → 自動重試
-  - 500/502/503 → 最多重試 3 次，backoff 1s/2s/4s
-  - 400 Context Too Long → 減少 context → 重試
-  - Network error → 通知 client 連線中斷
+### SDK Error 處理
 
-Tool execution errors:
-  - 回傳 error message 給 Claude → Claude 會自行修正
-  - 例：file_write 失敗 → Claude 看到 error → 嘗試不同方式
-
-Stream interruption:
-  - Client 斷線 → Server 繼續處理（結果存 DB）
-  - Client 重連 → 從 DB 讀取完整回覆
 ```
+AbortError:
+  → 靜默處理（使用者主動取消）
+
+Authentication errors (exit code 1):
+  → 檢查環境變數設定
+  → 提供具體指引：
+    "Please set CLAUDE_CODE_OAUTH_TOKEN (run `claude setup-token`)
+     or ANTHROPIC_API_KEY environment variable."
+
+SDK result.subtype !== 'success':
+  → 解析 errors 陣列
+  → 發射 error event 到 client
+
+一般錯誤:
+  → 發射 chat_error event 到 client
+  → throw Error 讓上層處理
+```
+
+### WebSocket 斷線處理
+
+```
+ws.on('close'):
+  → 中止所有 active runners (runner.abort())
+  → 清空 activeRunners map
+  → 取消所有 pending tool approvals
+
+ws.on('error'):
+  → 同上
+```
+
+### Tool Approval
+
+支援 tool approval flow（用於非 `bypassPermissions` 模式）：
+- `tool_approval_response` message type
+- `toolApprovalStore` 管理 pending approvals
+- WebSocket 斷線時自動 reject 所有 pending approvals
+
+## Chat Retry
+
+支援重試失敗的對話：
+
+```
+1. Client 發送 chat_retry { conversationId }
+2. 從 DB 取最後一則 user message
+3. 建立新的 conversation（title: "Retry: ..."）
+4. 發送 conversation_created event（含 isRetry flag）
+5. 以新 conversation 重新執行 handleChatMessage
+```
+
+## WebSocket Message Flow
+
+### Client → Server
+
+| Message Type | 說明 | 需要 Auth |
+|---|---|---|
+| `auth` | JWT 認證 | No |
+| `chat_send` | 發送聊天訊息 | Yes |
+| `chat_retry` | 重試上一則訊息 | Yes |
+| `tool_approval_response` | Tool 使用批准/拒絕 | Yes |
+
+### Server → Client
+
+| Message Type | 說明 |
+|---|---|
+| `auth_success` / `auth_error` | 認證結果 |
+| `conversation_created` | 新對話建立（含 conversationId） |
+| `chat_start` | AI 開始處理 |
+| `chat_chunk` | AI 文字回覆（streaming） |
+| `tool_use` | AI 使用了某個 tool |
+| `tool_result` | Tool 執行結果 |
+| `chat_complete` | AI 完成回覆（含 modifiedFiles, tokenUsage） |
+| `chat_error` | 錯誤 |
+| `diff_ready` | 有檔案被修改，可以 review diff |
+| `files_skipped` | 檔案因大小限制被跳過 |
+| `error` | 一般性錯誤（rate limit、未認證等） |

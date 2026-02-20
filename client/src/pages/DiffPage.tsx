@@ -88,30 +88,11 @@ export function DiffPage() {
 
   return (
     <AppLayout>
-      {/* Header */}
+      {/* Header — tap to open file list */}
       <header className="flex items-center px-4 h-14 border-b border-border bg-bg-secondary flex-shrink-0">
         <button
-          onClick={() => navigate('/')}
-          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-bg-tertiary"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className="w-5 h-5 text-text-secondary"
-          >
-            <path
-              fillRule="evenodd"
-              d="M7.72 12.53a.75.75 0 0 1 0-1.06l7.5-7.5a.75.75 0 1 1 1.06 1.06L9.31 12l6.97 6.97a.75.75 0 1 1-1.06 1.06l-7.5-7.5Z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-
-        {/* Tappable header area to open file sheet */}
-        <button
           onClick={() => files.length > 0 && setShowFileSheet(true)}
-          className="flex-1 ml-3 text-left"
+          className="flex-1 text-left"
         >
           <h1 className="text-base font-medium text-text-primary">
             {currentReview ? 'Diff Review' : 'Current Changes'}
