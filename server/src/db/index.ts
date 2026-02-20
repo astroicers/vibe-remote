@@ -73,4 +73,71 @@ function runMigrations(database: Database.Database): void {
     database.exec('ALTER TABLE conversations ADD COLUMN sdk_session_id TEXT');
     console.log('✅ Migration: Added sdk_session_id column to conversations');
   }
+
+  // Migration 2: Update tasks table to support new statuses and fields
+  // Add result and error columns if missing
+  const hasResultColumn = database
+    .prepare("SELECT COUNT(*) as count FROM pragma_table_info('tasks') WHERE name = 'result'")
+    .get() as { count: number };
+
+  if (hasResultColumn.count === 0) {
+    database.exec('ALTER TABLE tasks ADD COLUMN result TEXT');
+    database.exec('ALTER TABLE tasks ADD COLUMN error TEXT');
+    console.log('✅ Migration: Added result and error columns to tasks');
+  }
+
+  // Add updated_at column if missing
+  const hasUpdatedAt = database
+    .prepare("SELECT COUNT(*) as count FROM pragma_table_info('tasks') WHERE name = 'updated_at'")
+    .get() as { count: number };
+
+  if (hasUpdatedAt.count === 0) {
+    database.exec("ALTER TABLE tasks ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))");
+    console.log('✅ Migration: Added updated_at column to tasks');
+  }
+
+  // Recreate tasks table with extended status CHECK constraint
+  // SQLite doesn't support ALTER TABLE to modify CHECK constraints, so we
+  // drop and recreate only if old constraint is still in place.
+  // We detect this by trying to insert a 'pending' row and see if it fails.
+  try {
+    const testId = '__migration_test__';
+    database.prepare(
+      `INSERT INTO tasks (id, workspace_id, title, description, status, priority)
+       VALUES (?, '__test__', '__test__', '__test__', 'pending', 'normal')`
+    ).run(testId);
+    // If we get here, 'pending' is allowed — clean up and move on
+    database.prepare('DELETE FROM tasks WHERE id = ?').run(testId);
+  } catch {
+    // 'pending' is not allowed by old CHECK constraint — recreate the table
+    console.log('✅ Migration: Recreating tasks table with extended status values');
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS tasks_new (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending', 'queued', 'running', 'awaiting_review', 'approved', 'committed', 'completed', 'failed', 'cancelled')),
+        priority TEXT NOT NULL DEFAULT 'normal'
+          CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+        progress INTEGER,
+        branch TEXT,
+        depends_on TEXT,
+        context_files TEXT,
+        result TEXT,
+        error TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        started_at TEXT,
+        completed_at TEXT,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT OR IGNORE INTO tasks_new (id, workspace_id, title, description, status, priority, progress, branch, depends_on, context_files, created_at, started_at, completed_at)
+        SELECT id, workspace_id, title, description, status, priority, progress, branch, depends_on, context_files, created_at, started_at, completed_at FROM tasks;
+      DROP TABLE tasks;
+      ALTER TABLE tasks_new RENAME TO tasks;
+      CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+    `);
+  }
 }

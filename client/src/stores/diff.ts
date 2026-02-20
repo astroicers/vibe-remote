@@ -38,6 +38,7 @@ interface DiffState {
   rejectAll: (workspaceId: string) => Promise<void>;
   approveFile: (workspaceId: string, path: string) => Promise<void>;
   rejectFile: (workspaceId: string, path: string) => Promise<void>;
+  addComment: (workspaceId: string, filePath: string, content: string) => Promise<void>;
   selectFile: (workspaceId: string, file: FileDiff | null) => void;
   clearError: () => void;
 }
@@ -213,6 +214,35 @@ export const useDiffStore = create<DiffState>((set, get) => ({
       set({
         isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to reject file',
+      });
+    }
+  },
+
+  addComment: async (workspaceId: string, filePath: string, content: string) => {
+    const wsDiff = get().getDiffState(workspaceId);
+    if (!wsDiff.currentReview) return;
+
+    try {
+      const comment = await diff.addComment(wsDiff.currentReview.id, filePath, content);
+      set((state) => {
+        const current = state.diffByWorkspace[workspaceId];
+        if (!current?.currentReview) return state;
+        return {
+          diffByWorkspace: {
+            ...state.diffByWorkspace,
+            [workspaceId]: {
+              ...current,
+              currentReview: {
+                ...current.currentReview,
+                comments: [...current.currentReview.comments, comment],
+              },
+            },
+          },
+        };
+      });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to add comment',
       });
     }
   },

@@ -1,7 +1,7 @@
 // Settings Page - App configuration and preferences
 
-import { useState } from 'react';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { useSettingsStore, VOICE_LANGUAGES } from '../stores/settings';
 import { AppLayout } from '../components/AppLayout';
 
 interface SettingItemProps {
@@ -61,22 +61,18 @@ function Toggle({
 }
 
 export function SettingsPage() {
-  const [model, setModel] = useState<'sonnet' | 'opus'>('sonnet');
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [autoCommitMsg, setAutoCommitMsg] = useState(true);
-  const [projectsPath, setProjectsPath] = useState(() => localStorage.getItem('settings_projects_path') || '');
-  const [projectsPathSaved, setProjectsPathSaved] = useState(false);
-
-  const handleSaveProjectsPath = () => {
-    const trimmed = projectsPath.trim();
-    if (trimmed) {
-      localStorage.setItem('settings_projects_path', trimmed);
-    } else {
-      localStorage.removeItem('settings_projects_path');
-    }
-    setProjectsPathSaved(true);
-    setTimeout(() => setProjectsPathSaved(false), 2000);
-  };
+  const {
+    model,
+    voiceEnabled,
+    voiceLanguage,
+    autoCommitMsg,
+    projectsPath,
+    setModel,
+    setVoiceEnabled,
+    setVoiceLanguage,
+    setAutoCommitMsg,
+    setProjectsPath,
+  } = useSettingsStore();
 
   // Push notifications
   const {
@@ -113,25 +109,13 @@ export function SettingsPage() {
             <div>
               <label className="block text-sm font-medium text-text-primary mb-1">Projects Path</label>
               <p className="text-xs text-text-muted mb-2">Root directory containing your git repos. Used for auto-discovery when adding workspaces.</p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={projectsPath}
-                  onChange={(e) => { setProjectsPath(e.target.value); setProjectsPathSaved(false); }}
-                  placeholder="/home/ubuntu"
-                  className="flex-1 px-3 py-2 bg-bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
-                />
-                <button
-                  onClick={handleSaveProjectsPath}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    projectsPathSaved
-                      ? 'bg-success/20 text-success'
-                      : 'bg-accent text-white hover:bg-accent/90'
-                  }`}
-                >
-                  {projectsPathSaved ? 'Saved' : 'Save'}
-                </button>
-              </div>
+              <input
+                type="text"
+                value={projectsPath}
+                onChange={(e) => setProjectsPath(e.target.value)}
+                placeholder="/home/ubuntu"
+                className="w-full px-3 py-2 bg-bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+              />
             </div>
           </div>
         </section>
@@ -197,6 +181,26 @@ export function SettingsPage() {
             >
               <Toggle enabled={voiceEnabled} onChange={setVoiceEnabled} />
             </SettingItem>
+
+            {voiceEnabled && (
+              <SettingItem
+                icon={<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM6.262 6.072a8.25 8.25 0 1 0 10.562-.766 4.5 4.5 0 0 1-1.318 1.357L14.25 7.5l.165.33a.809.809 0 0 1-1.086 1.085l-.604-.302a1.125 1.125 0 0 0-1.298.21l-.132.131c-.439.44-.439 1.152 0 1.591l.296.296c.256.257.622.374.98.314l1.17-.195c.323-.054.654.036.905.245l1.33 1.108c.32.267.46.694.358 1.1a8.7 8.7 0 0 1-2.288 4.04l-.723.724a1.125 1.125 0 0 1-1.298.21l-.153-.076a1.125 1.125 0 0 1-.622-1.006v-1.089c0-.298-.119-.585-.33-.796l-1.347-1.347a1.125 1.125 0 0 1-.21-1.298L9.75 12l-1.64-1.64a6 6 0 0 1-1.676-3.257l-.172-1.03Z" clipRule="evenodd" /></svg>}
+                label="Voice Language"
+                description="Language for speech recognition"
+              >
+                <select
+                  value={voiceLanguage}
+                  onChange={(e) => setVoiceLanguage(e.target.value)}
+                  className="bg-bg-surface border border-border rounded-lg px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent"
+                >
+                  {VOICE_LANGUAGES.map((lang) => (
+                    <option key={lang.code} value={lang.code}>
+                      {lang.label}
+                    </option>
+                  ))}
+                </select>
+              </SettingItem>
+            )}
           </div>
         </section>
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FileList, DiffViewer, ReviewActions } from '../components/diff';
+import { FileList, DiffViewer, ReviewActions, DiffCommentInput, DiffCommentList } from '../components/diff';
 import { AppLayout } from '../components/AppLayout';
 import { BottomSheet } from '../components/BottomSheet';
 import { useDiffStore } from '../stores/diff';
@@ -25,6 +25,7 @@ export function DiffPage() {
     rejectAll,
     approveFile,
     rejectFile,
+    addComment,
     selectFile,
     clearError,
   } = useDiffStore();
@@ -234,6 +235,25 @@ export function DiffPage() {
               </div>
 
               <DiffViewer file={selectedFile} />
+
+              {/* Comments section for current file */}
+              {currentReview && (
+                <div className="border-t border-border">
+                  <DiffCommentList
+                    comments={currentReview.comments.filter(
+                      (c) => c.filePath === selectedFile.path
+                    )}
+                    filePath={selectedFile.path}
+                  />
+                  <DiffCommentInput
+                    onSubmit={(content) =>
+                      addComment(wsId, selectedFile.path, content)
+                    }
+                    disabled={currentReview.status !== 'pending'}
+                    placeholder={`Comment on ${selectedFile.path.split('/').pop()}...`}
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center justify-center h-full text-text-muted">

@@ -334,4 +334,74 @@ export const notifications = {
     }),
 };
 
+// Templates API
+export interface PromptTemplate {
+  id: string;
+  workspace_id: string | null;
+  name: string;
+  content: string;
+  sort_order: number;
+  created_at: string;
+}
+
+export const templates = {
+  list: (workspaceId: string) =>
+    request<PromptTemplate[]>(`/templates?workspaceId=${workspaceId}`),
+
+  create: (data: { workspaceId?: string; name: string; content: string }) =>
+    request<PromptTemplate>('/templates', { method: 'POST', json: data }),
+
+  update: (id: string, data: { name?: string; content?: string }) =>
+    request<PromptTemplate>(`/templates/${id}`, { method: 'PATCH', json: data }),
+
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/templates/${id}`, { method: 'DELETE' }),
+};
+
+// Tasks API
+export type TaskStatus = 'pending' | 'queued' | 'running' | 'awaiting_review' | 'approved' | 'committed' | 'completed' | 'failed' | 'cancelled';
+export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent';
+
+export interface Task {
+  id: string;
+  workspace_id: string;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  progress: number | null;
+  branch: string | null;
+  depends_on: string | null;
+  context_files: string | null;
+  result: string | null;
+  error: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  updated_at: string;
+}
+
+export const tasks = {
+  list: (workspaceId: string) =>
+    request<Task[]>(`/tasks?workspaceId=${workspaceId}`),
+
+  get: (id: string) =>
+    request<Task>(`/tasks/${id}`),
+
+  create: (data: { workspaceId: string; title: string; description: string; priority?: TaskPriority; contextFiles?: string[] }) =>
+    request<Task>('/tasks', { method: 'POST', json: data }),
+
+  update: (id: string, data: Partial<{ title: string; description: string; priority: TaskPriority; status: TaskStatus }>) =>
+    request<Task>(`/tasks/${id}`, { method: 'PATCH', json: data }),
+
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/tasks/${id}`, { method: 'DELETE' }),
+
+  run: (id: string) =>
+    request<Task>(`/tasks/${id}/run`, { method: 'POST' }),
+
+  cancel: (id: string) =>
+    request<Task>(`/tasks/${id}/cancel`, { method: 'POST' }),
+};
+
 export { ApiError };

@@ -19,6 +19,7 @@ import {
   formatFileSize,
   LIMITS,
 } from '../utils/truncate.js';
+import { getWatcher, type FileChangeEvent } from '../workspace/watcher.js';
 
 // Message schemas
 const chatMessageSchema = z.object({
@@ -51,6 +52,43 @@ interface AuthenticatedSocket extends WebSocket {
   deviceId?: string;
   deviceName?: string;
   isAuthenticated?: boolean;
+}
+
+// Track all connected WebSocket clients for broadcasting
+const connectedClients = new Set<AuthenticatedSocket>();
+
+// Initialize watcher callback (runs once — singleton watcher)
+const watcher = getWatcher();
+watcher.onChanges((workspaceId: string, changes: FileChangeEvent[]) => {
+  const event = {
+    type: 'files_changed',
+    workspaceId,
+    files: changes.map(c => ({ type: c.type, path: c.relativePath })),
+    timestamp: new Date().toISOString(),
+  };
+  const payload = JSON.stringify(event);
+
+  for (const client of connectedClients) {
+    if (client.readyState === client.OPEN && client.isAuthenticated) {
+      client.send(payload);
+    }
+  }
+});
+
+// Broadcast task status changes to all connected clients
+export function broadcastTaskStatus(task: Record<string, unknown>): void {
+  const event = {
+    type: 'task_status',
+    task,
+    timestamp: new Date().toISOString(),
+  };
+  const payload = JSON.stringify(event);
+
+  for (const client of connectedClients) {
+    if (client.readyState === client.OPEN && client.isAuthenticated) {
+      client.send(payload);
+    }
+  }
 }
 
 // Rate limiting
@@ -94,6 +132,8 @@ function runnerKey(workspaceId: string, conversationId: string): string {
 }
 
 export function handleChatWebSocket(ws: AuthenticatedSocket): void {
+  // Track this client for broadcasting
+  connectedClients.add(ws);
 
   ws.on('message', async (data) => {
     let parsed: unknown;
@@ -270,6 +310,9 @@ export function handleChatWebSocket(ws: AuthenticatedSocket): void {
   });
 
   ws.on('close', () => {
+    // Remove from connected clients
+    connectedClients.delete(ws);
+
     // Abort all running Claude SDK queries
     for (const [_key, state] of activeRunners) {
       state.runner.abort();
@@ -287,6 +330,7 @@ export function handleChatWebSocket(ws: AuthenticatedSocket): void {
 
   ws.on('error', (error) => {
     console.error('WebSocket error:', error);
+    connectedClients.delete(ws);
     for (const [_key, state] of activeRunners) {
       state.runner.abort();
     }
@@ -346,6 +390,11 @@ async function handleChatMessage(
   if (!workspace) {
     send(ws, { type: 'chat_error', workspaceId, conversationId, error: 'Workspace not found' });
     throw new Error('Workspace not found');
+  }
+
+  // Start watching workspace files if not already watching
+  if (!watcher.isWatching(workspace.id)) {
+    watcher.watch(workspace.id, workspace.path);
   }
 
   // Save user message

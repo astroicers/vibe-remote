@@ -39,6 +39,7 @@ interface WorkspaceChatState {
   showTokenUsage: boolean;
   pendingApprovals: PendingToolApproval[];
   unreadCount: number;
+  selectedFiles: string[];
 }
 
 function createDefaultWorkspaceChatState(): WorkspaceChatState {
@@ -53,6 +54,7 @@ function createDefaultWorkspaceChatState(): WorkspaceChatState {
     showTokenUsage: false,
     pendingApprovals: [],
     unreadCount: 0,
+    selectedFiles: [],
   };
 }
 
@@ -71,6 +73,8 @@ interface ChatState {
   retryConversation: (workspaceId: string, conversationId: string) => void;
 
   deleteConversation: (workspaceId: string, conversationId: string) => Promise<void>;
+
+  setSelectedFiles: (workspaceId: string, files: string[]) => void;
 
   incrementUnread: (workspaceId: string) => void;
   clearUnread: (workspaceId: string) => void;
@@ -357,6 +361,14 @@ export const useChatStore = create<ChatState>((set, get) => {
       } catch (error) {
         set({ error: error instanceof Error ? error.message : 'Failed to delete conversation' });
       }
+    },
+
+    setSelectedFiles: (workspaceId: string, files: string[]) => {
+      set((state) =>
+        updateWorkspaceChat(state, workspaceId, () => ({
+          selectedFiles: files,
+        }))
+      );
     },
 
     incrementUnread: (workspaceId: string) => {

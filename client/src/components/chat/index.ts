@@ -1,6 +1,11 @@
 export { MessageBubble } from './MessageBubble';
 export { MessageList } from './MessageList';
 export { ChatInput } from './ChatInput';
+export { AttachButton } from './AttachButton';
+export { FileTree } from './FileTree';
+export type { FileNode } from './FileTree';
+export { ContextFileSheet } from './ContextFileSheet';
+export { PromptTemplateSheet } from './PromptTemplateSheet';
 export { TokenUsageCard } from './TokenUsageCard';
 export { ToolApprovalCard } from './ToolApprovalCard';
 export type { ToolApprovalInfo } from './ToolApprovalCard';

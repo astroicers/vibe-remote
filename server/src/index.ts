@@ -12,6 +12,7 @@ import { config } from './config.js';
 import { initDb, closeDb } from './db/index.js';
 import routes from './routes/index.js';
 import { handleChatWebSocket } from './ws/index.js';
+import { getWatcher } from './workspace/watcher.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -95,6 +96,7 @@ const server = app.listen(config.PORT, config.HOST, () => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('🛑 Shutting down...');
+  getWatcher().unwatchAll();
   server.close(() => {
     closeDb();
     console.log('👋 Server closed');
@@ -104,6 +106,7 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
   console.log('🛑 Shutting down...');
+  getWatcher().unwatchAll();
   server.close(() => {
     closeDb();
     console.log('👋 Server closed');

@@ -174,3 +174,23 @@ export function sendChatMessage(
     selectedFiles,
   });
 }
+
+// File change event types
+export interface FileChangeInfo {
+  type: 'add' | 'change' | 'unlink';
+  path: string;
+}
+
+export interface FilesChangedEvent {
+  type: 'files_changed';
+  workspaceId: string;
+  files: FileChangeInfo[];
+  timestamp: string;
+}
+
+// Task status event types
+export interface TaskStatusEvent {
+  type: 'task_status';
+  task: Record<string, unknown>;
+  timestamp: string;
+}

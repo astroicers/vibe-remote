@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageList, ChatInput, TokenUsageCard, ToolApprovalCard } from '../components/chat';
+import { MessageList, ChatInput, TokenUsageCard, ToolApprovalCard, ContextFileSheet, PromptTemplateSheet } from '../components/chat';
 import { QuickActions } from '../components/actions';
 import { AppLayout } from '../components/AppLayout';
 import { ConversationSelector } from '../components/ConversationSelector';
@@ -12,6 +12,9 @@ export function ChatPage() {
   const navigate = useNavigate();
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showConversations, setShowConversations] = useState(false);
+  const [showFileSheet, setShowFileSheet] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [prefillText, setPrefillText] = useState('');
   const { isAuthenticated, checkAuth } = useAuthStore();
 
   const {
@@ -36,6 +39,7 @@ export function ChatPage() {
     loadConversations,
     loadConversation,
     clearUnread,
+    setSelectedFiles,
     error,
   } = useChatStore();
 
@@ -50,6 +54,7 @@ export function ChatPage() {
     pendingApprovals,
     currentConversationId,
     conversations,
+    selectedFiles,
   } = wsChat;
 
   // Check auth on mount
@@ -101,7 +106,7 @@ export function ChatPage() {
 
   const handleSend = (content: string) => {
     if (!wsId) return;
-    sendMessage(wsId, content);
+    sendMessage(wsId, content, selectedFiles.length > 0 ? selectedFiles : undefined);
   };
 
   const handleNewConversation = async () => {
@@ -216,14 +221,43 @@ export function ChatPage() {
               if (wsId) loadGitStatus(wsId);
               setShowQuickActions(true);
             }}
+            onAttachFiles={() => setShowFileSheet(true)}
+            onTemplates={() => setShowTemplates(true)}
+            selectedFileCount={selectedFiles.length}
             disabled={isSending || isStreaming}
             placeholder={isStreaming ? 'AI is thinking...' : 'Type a message...'}
+            prefillText={prefillText}
           />
         </>
       )}
 
       {/* Quick Actions Panel */}
       <QuickActions isOpen={showQuickActions} onClose={() => setShowQuickActions(false)} />
+
+      {/* Prompt Template Sheet */}
+      {wsId && (
+        <PromptTemplateSheet
+          isOpen={showTemplates}
+          onClose={() => setShowTemplates(false)}
+          workspaceId={wsId}
+          onSelectTemplate={(content) => {
+            setPrefillText(content);
+            // Reset prefillText after a tick so the same template can be selected again
+            setTimeout(() => setPrefillText(''), 0);
+          }}
+        />
+      )}
+
+      {/* Context File Sheet */}
+      {wsId && (
+        <ContextFileSheet
+          isOpen={showFileSheet}
+          onClose={() => setShowFileSheet(false)}
+          workspaceId={wsId}
+          selectedFiles={selectedFiles}
+          onSelectionChange={(files) => setSelectedFiles(wsId, files)}
+        />
+      )}
 
       {/* Conversation Selector */}
       {wsId && (
