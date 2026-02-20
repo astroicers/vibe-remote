@@ -79,6 +79,19 @@ Docker 部署:
   └── Proxy /api → server:8080, /ws → server:8080
 ```
 
+**Routes** (`server/src/routes/`):
+```
+routes/
+├── index.ts          # Route aggregator
+├── auth.ts           # /api/auth — JWT pairing, device management
+├── workspaces.ts     # /api/workspaces — Workspace CRUD, file tree, git ops
+├── chat.ts           # /api/chat — Conversation and message management
+├── diff.ts           # /api/diff — Diff review and comments
+├── notifications.ts  # /api/notifications — Push subscription management
+├── tasks.ts          # /api/tasks — Task CRUD, run, cancel
+└── templates.ts      # /api/templates — Prompt template CRUD
+```
+
 **設計決策**：
 - Docker Compose 分離 server/client，方便獨立 rebuild
 - Express + express-ws 處理 WebSocket
@@ -174,6 +187,9 @@ Workspace Manager
 │   ├── checkoutBranch()   # switch/create branch
 │   └── discardChanges()   # revert modified files
 │
+├── watcher.ts          # 檔案系統監控 (chokidar)
+│   └── FileWatcher     # 監聽 workspace 內的檔案變更
+│
 └── file-tree.ts        # 檔案結構
     └── getFileTree()    # 遞迴讀取，respect .gitignore
 ```
@@ -212,12 +228,17 @@ Tool Approval (server/src/ws/tool-approval.ts)
 │   └── reject()         # 拒絕（含斷線時自動拒絕）
 ```
 
-### 6. Task Runner (Phase 2 — 未實作)
+### 6. Task Runner (Implemented)
 
-非同步任務執行系統。目錄已建立但尚無實作。
+非同步任務執行系統。支援 AI 驅動的任務執行與 in-memory queue。
 
 ```
-Task Runner (server/src/tasks/) — 空目錄
+Task Runner (server/src/tasks/)
+├── manager.ts       # Task CRUD (create/list/get/update/delete)
+├── queue.ts         # In-memory TaskQueue with runner integration
+├── runner.ts        # AI-powered task execution via ClaudeSdkRunner
+├── index.ts         # Module exports
+└── *.test.ts        # Unit tests (manager, queue, runner)
 ```
 
 ## 資料流
@@ -259,9 +280,9 @@ Server 執行 git diff → 解析為 per-file breakdown
     ▼
 User reviews file-by-file（BottomSheet 選檔案）
     │
-    ├─ ✅ Approve → file 標記為 approved
-    ├─ ❌ Reject  → revert 該檔案的改動
-    └─ 💬 Comment → 附加到 diff_comments
+    ├─ Approve → file 標記為 approved
+    ├─ Reject  → revert 該檔案的改動
+    └─ Comment → 附加到 diff_comments
     │
     ▼
 All files approved?
@@ -320,7 +341,9 @@ zustand stores:
 ├── chat.ts          # workspaceChats: Record<string, WorkspaceChatState>
 ├── diff.ts          # diffByWorkspace: Record<string, WorkspaceDiffState>
 ├── toast.ts         # 全域 toast 通知
-└── auth.ts          # JWT token + device info
+├── auth.ts          # JWT token + device info
+├── settings.ts      # User preferences and app settings
+└── tasks.ts         # Task list state per workspace
 ```
 
 所有 store 的 action 接收明確 `workspaceId` 參數，不依賴隱式全域狀態。

@@ -189,7 +189,7 @@
 ### GET /api/workspaces/active
 取得目前 active 的 workspace。
 
-> **⚠️ Deprecated**: 多 workspace 架構下已不建議使用。請改用 `GET /api/workspaces/:id`。
+> **Deprecated**: 多 workspace 架構下已不建議使用。請改用 `GET /api/workspaces/:id`。
 
 **Response** `200`: 同 workspace 物件
 
@@ -252,7 +252,7 @@
 ### POST /api/workspaces/:id/activate
 將指定 workspace 設為 active。
 
-> **⚠️ Deprecated**: 多 workspace 架構下已不建議使用。前端已改為直接帶 workspaceId。
+> **Deprecated**: 多 workspace 架構下已不建議使用。前端已改為直接帶 workspaceId。
 
 **Response** `200`: 更新後的 workspace 物件
 
@@ -1350,14 +1350,329 @@ Client 實作了 exponential backoff 自動重連：
 
 ---
 
-## 附錄: 尚未實作（Phase 2+）
+## 8. Tasks
 
-以下功能在 schema 或規劃中存在但目前未實作 API：
+> All task routes require JWT authentication. Routes are mounted at `/api/tasks`.
 
-- **Tasks** — Task queue system（BullMQ + Redis），DB table 已建但無 REST API
-- **Terminal** — PTY terminal 遠端執行
-- **Templates** — Prompt templates CRUD API，DB table 已建但無 REST API
-- **Search** — 全文搜尋 codebase（ripgrep integration）
-- **Image upload** — 上傳圖片到對話 context
-- **Auto commit message** — AI 自動產生 commit message
-- **PR creation** — 從 API 建立 GitHub PR
+### GET /api/tasks
+List tasks for a workspace.
+
+**Query Parameters**:
+- `workspaceId` (string, **required**) -- Filter by workspace
+
+**Response** `200`: Array of task objects
+
+**Error** `400`:
+```json
+{
+  "error": "workspaceId is required",
+  "code": "MISSING_WORKSPACE_ID"
+}
+```
+
+---
+
+### GET /api/tasks/:id
+Get a single task by ID.
+
+**Response** `200`: Task object
+
+**Error** `404`:
+```json
+{
+  "error": "Task not found",
+  "code": "NOT_FOUND"
+}
+```
+
+---
+
+### POST /api/tasks
+Create a new task.
+
+**Request**:
+```json
+{
+  "workspaceId": "ws_abc123",
+  "title": "Add unit tests",
+  "description": "Write unit tests for the auth module",
+  "priority": "normal",
+  "contextFiles": ["src/auth/middleware.ts"]
+}
+```
+
+**Validation** (zod):
+- `workspaceId` (string, required)
+- `title` (string, required, min 1 char)
+- `description` (string, required, min 1 char)
+- `priority` (enum: `"low"` | `"normal"` | `"high"` | `"urgent"`, optional, default `"normal"`)
+- `contextFiles` (string[], optional)
+
+**Response** `201`: Newly created task object
+
+**Error** `400`:
+```json
+{
+  "error": "Invalid request: workspaceId, title, and description are required",
+  "code": "VALIDATION_ERROR",
+  "details": [...]
+}
+```
+
+---
+
+### PATCH /api/tasks/:id
+Update task fields. At least one field must be provided.
+
+**Request**:
+```json
+{
+  "title": "Updated title",
+  "description": "Updated description",
+  "priority": "high",
+  "status": "pending"
+}
+```
+
+**Validation** (zod, all optional):
+- `title` (string, min 1 char)
+- `description` (string, min 1 char)
+- `priority` (enum: `"low"` | `"normal"` | `"high"` | `"urgent"`)
+- `status` (enum: `"pending"` | `"queued"` | `"running"` | `"awaiting_review"` | `"approved"` | `"committed"` | `"completed"` | `"failed"` | `"cancelled"`)
+
+**Response** `200`: Updated task object
+
+**Error** `400`:
+```json
+{
+  "error": "At least one field must be provided",
+  "code": "VALIDATION_ERROR"
+}
+```
+
+**Error** `404`:
+```json
+{
+  "error": "Task not found",
+  "code": "NOT_FOUND"
+}
+```
+
+---
+
+### DELETE /api/tasks/:id
+Delete a task. Cannot delete a running task (cancel it first).
+
+**Response** `200`:
+```json
+{
+  "success": true
+}
+```
+
+**Error** `400` (task is running):
+```json
+{
+  "error": "Cannot delete a running task. Cancel it first.",
+  "code": "TASK_RUNNING"
+}
+```
+
+**Error** `404`:
+```json
+{
+  "error": "Task not found",
+  "code": "NOT_FOUND"
+}
+```
+
+---
+
+### POST /api/tasks/:id/run
+Enqueue a task for AI execution. Only tasks with `"pending"` status can be run.
+
+**Request**: No body
+
+**Response** `200`: Task object (status will be updated by the queue)
+
+**Error** `400`:
+```json
+{
+  "error": "Cannot run task with status \"running\". Only pending tasks can be run.",
+  "code": "INVALID_STATUS"
+}
+```
+
+**Error** `404`:
+```json
+{
+  "error": "Task not found",
+  "code": "NOT_FOUND"
+}
+```
+
+---
+
+### POST /api/tasks/:id/cancel
+Cancel a pending or running task.
+
+**Request**: No body
+
+**Response** `200`: Updated task object (status set to `"cancelled"`)
+
+**Error** `400`:
+```json
+{
+  "error": "Cannot cancel task with status \"completed\". Only pending or running tasks can be cancelled.",
+  "code": "INVALID_STATUS"
+}
+```
+
+**Error** `404`:
+```json
+{
+  "error": "Task not found",
+  "code": "NOT_FOUND"
+}
+```
+
+**Error** `500`:
+```json
+{
+  "error": "Failed to cancel task",
+  "code": "CANCEL_FAILED"
+}
+```
+
+---
+
+## 9. Templates
+
+> All template routes require JWT authentication. Routes are mounted at `/api/templates`.
+
+### GET /api/templates
+List prompt templates (global templates where `workspace_id` is NULL, plus workspace-specific templates).
+
+**Query Parameters**:
+- `workspaceId` (string, **required**) -- Returns global templates + templates for this workspace
+
+**Response** `200`: Array of template objects, ordered by `sort_order ASC, created_at ASC`
+
+```json
+[
+  {
+    "id": "tpl_fix_lint",
+    "workspace_id": null,
+    "name": "Fix lint",
+    "content": "Fix all linting errors in the codebase",
+    "sort_order": 1,
+    "created_at": "2025-03-01T10:00:00Z"
+  }
+]
+```
+
+**Error** `400`:
+```json
+{
+  "error": "workspaceId is required",
+  "code": "MISSING_WORKSPACE_ID"
+}
+```
+
+---
+
+### POST /api/templates
+Create a new prompt template.
+
+**Request**:
+```json
+{
+  "workspaceId": "ws_abc123",
+  "name": "Fix lint",
+  "content": "Fix all linting errors in the codebase"
+}
+```
+
+**Validation** (zod):
+- `workspaceId` (string, optional) -- Omit for global template
+- `name` (string, required, min 1 char)
+- `content` (string, required, min 1 char)
+
+**Note**: `sort_order` is automatically set to the next available value.
+
+**Response** `201`: Newly created template object
+
+**Error** `400`:
+```json
+{
+  "error": "Invalid request: name and content are required",
+  "code": "VALIDATION_ERROR"
+}
+```
+
+---
+
+### PATCH /api/templates/:id
+Update a template. At least one of `name` or `content` must be provided.
+
+**Request**:
+```json
+{
+  "name": "Updated name",
+  "content": "Updated content"
+}
+```
+
+**Validation** (zod, all optional):
+- `name` (string, min 1 char)
+- `content` (string, min 1 char)
+
+**Response** `200`: Updated template object
+
+**Error** `400`:
+```json
+{
+  "error": "At least one of name or content must be provided",
+  "code": "VALIDATION_ERROR"
+}
+```
+
+**Error** `404`:
+```json
+{
+  "error": "Template not found",
+  "code": "NOT_FOUND"
+}
+```
+
+---
+
+### DELETE /api/templates/:id
+Delete a prompt template.
+
+**Response** `200`:
+```json
+{
+  "success": true
+}
+```
+
+**Error** `404`:
+```json
+{
+  "error": "Template not found",
+  "code": "NOT_FOUND"
+}
+```
+
+---
+
+## Appendix: Not Yet Implemented (Phase 2+)
+
+The following features are planned but do not yet have API endpoints:
+
+- **Terminal** -- PTY terminal remote execution
+- **Search** -- Full-text codebase search (ripgrep integration)
+- **Image upload** -- Upload images to conversation context
+- **Auto commit message** -- AI-generated commit messages
+- **PR creation** -- Create GitHub PRs from API

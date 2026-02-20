@@ -32,21 +32,22 @@ Vibe Remote 讓你在手機上透過自然語言（語音 + 文字）驅動 AI �
 
 ## 功能
 
-### 已完成 — MVP + Multi-Workspace
-- **AI Chat**：全螢幕對話介面，多 workspace 並行對話，自動 resume 上次對話
-- **Diff Review**：file-by-file code review，approve / reject / comment
-- **Quick Actions**：commit、push、pull、branch 操作
-- **Multi-Workspace**：橫向 tab 切換，每個 workspace 獨立 chat / diff / git 狀態
-- **Workspace Scanner**：Settings 設定 projects path，自動掃描 git repos
-- **Push Notifications**：AI 完成任務時推送通知 (VAPID)
-- **Token 優化**：Session Resume 降低重複 token 消耗
-- **PWA**：安裝到主畫面，離線快取
+### Completed -- MVP + Multi-Workspace + Task Queue
+- **AI Chat**: full-screen conversation UI, multi-workspace parallel chat, auto-resume last conversation
+- **Diff Review**: file-by-file code review, approve / reject / comment
+- **Quick Actions**: commit, push, pull, branch operations
+- **Multi-Workspace**: horizontal tab switching, per-workspace independent chat / diff / git state
+- **Workspace Scanner**: Settings to configure projects path, auto-scan git repos
+- **Push Notifications**: push notification on AI task completion (VAPID)
+- **Token Optimization**: Session Resume to reduce redundant token usage
+- **PWA**: install to home screen, offline cache
+- **Task Queue + Kanban UI**: async task queue with kanban board, task CRUD, in-memory queue, AI runner
+- **Prompt Templates**: template API with seed data for common coding tasks
 
-### 規劃中
-- 非同步任務佇列 + 看板式 UI
-- GitHub/GitLab 整合
-- 語音輸入 (Web Speech API)
-- Multi-model 切換
+### Planned
+- GitHub/GitLab integration
+- Voice input (Web Speech API)
+- Multi-model switching
 
 ## 技術棧
 
@@ -124,8 +125,9 @@ npm --prefix client run dev
 npm --prefix server run typecheck
 npm --prefix client run typecheck
 
-# 測試
+# Tests
 npm --prefix server test
+npm --prefix client test
 ```
 
 ### Docker 開發

@@ -1,58 +1,58 @@
 # Roadmap — Vibe Remote
 
-## Phase 1 — MVP：通勤時可以 Vibe Code ✅ 完成
+## Phase 1 -- MVP: Vibe Code during commute [done]
 
-**目標**：能在手機上與 AI 對話、review diff、commit + push。
+**Goal**: chat with AI on mobile, review diff, commit + push.
 
-**狀態**：✅ 全部完成（2026-02-18）
-
----
-
-### Sprint 1.1 — 基礎骨架 ✅
-
-| Task | 狀態 |
-|------|------|
-| 初始化 monorepo 結構 | ✅ |
-| Server: Express + WebSocket server | ✅ |
-| Client: React + Vite + Tailwind | ✅ |
-| Shared types 設定 | ✅ |
-| SQLite 初始化 + migration runner | ✅ |
-| .env + config 管理 | ✅ |
-| Docker Compose（雙容器架構） | ✅ |
+**Status**: [done] All completed (2026-02-18)
 
 ---
 
-### Sprint 1.2 — Auth + Workspace ✅
+### Sprint 1.1 -- Foundation [done]
 
-| Task | 狀態 |
-|------|------|
-| JWT 簽發/驗證/refresh | ✅ |
-| QR code pairing flow | ✅ (API 完成，前端使用 dev quick-pair) |
-| Auth middleware | ✅ |
-| Workspace CRUD API | ✅ |
-| File tree API | ✅ |
-| Git status API | ✅ |
-| Client: Repos page | ✅ |
-| Client: Bottom navigation（5 tabs） | ✅ |
+| Task | Status |
+|------|--------|
+| Initialize monorepo structure | [done] |
+| Server: Express + WebSocket server | [done] |
+| Client: React + Vite + Tailwind | [done] |
+| Shared types setup | [done] |
+| SQLite init + migration runner | [done] |
+| .env + config management | [done] |
+| Docker Compose (dual-container) | [done] |
 
 ---
 
-### Sprint 1.3 — Chat 核心 ✅
+### Sprint 1.2 -- Auth + Workspace [done]
 
-| Task | 狀態 |
-|------|------|
-| Claude Agent SDK 串接 (streaming) | ✅ |
-| Context builder（含 Token 優化） | ✅ |
-| Session Resume 支援（DB 欄位就緒，runtime disabled） | ✅ |
-| SDK 內建 tools（Read, Write, Edit, Bash, Grep, Glob） | ✅ |
-| Tool approval workflow | ✅ |
-| Chat WebSocket streaming | ✅ |
-| 對話持久化 (SQLite) | ✅ |
-| Client: Chat page | ✅ |
-| Client: ChatInput | ✅ |
-| Context file 選擇 | ✅ |
+| Task | Status |
+|------|--------|
+| JWT issue/verify/refresh | [done] |
+| QR code pairing flow | [done] (API complete, frontend uses dev quick-pair) |
+| Auth middleware | [done] |
+| Workspace CRUD API | [done] |
+| File tree API | [done] |
+| Git status API | [done] |
+| Client: Repos page | [done] |
+| Client: Bottom navigation (5 tabs) | [done] |
 
-**Token 優化措施**：
+---
+
+### Sprint 1.3 -- Chat Core [done]
+
+| Task | Status |
+|------|--------|
+| Claude Agent SDK integration (streaming) | [done] |
+| Context builder (with token optimization) | [done] |
+| Session Resume support (DB fields ready, runtime disabled) | [done] |
+| SDK built-in tools (Read, Write, Edit, Bash, Grep, Glob) | [done] |
+| Tool approval workflow | [done] |
+| Chat WebSocket streaming | [done] |
+| Conversation persistence (SQLite) | [done] |
+| Client: Chat page | [done] |
+| Client: ChatInput | [done] |
+| Context file selection | [done] |
+
+**Token optimization measures**:
 - Session Resume（DB 欄位就緒，Docker 環境尚不穩定）
 - 訊息截斷（2000 字元 / 5 條歷史）
 - 檔案大小限制（1MB）
@@ -60,71 +60,70 @@
 
 ---
 
-### Sprint 1.4 — Diff Review ✅
+### Sprint 1.4 -- Diff Review [done]
 
-| Task | 狀態 |
-|------|------|
-| Diff API (get/approve/reject/approve-all) | ✅ |
-| AI 修改後自動產生 diff | ✅ |
-| Reject + comment → 回饋 AI | ⚠️ (Comment API 存在，回饋 AI 重改尚未串接) |
-| Client: Diff page | ✅ |
-| Client: File-by-file navigation | ✅ |
-| Client: Approve/Reject/Comment buttons | ✅ |
-| Client: Approve All | ✅ |
-| Diff review 狀態持久化 | ✅ |
+| Task | Status |
+|------|--------|
+| Diff API (get/approve/reject/approve-all) | [done] |
+| Auto-generate diff after AI edits | [done] |
+| Reject + comment -> feedback to AI | NOTE: Comment API exists, AI re-edit feedback not yet wired |
+| Client: Diff page | [done] |
+| Client: File-by-file navigation | [done] |
+| Client: Approve/Reject/Comment buttons | [done] |
+| Client: Approve All | [done] |
+| Diff review state persistence | [done] |
 
 ---
 
-### Sprint 1.5 — Git Actions + PWA ✅
+### Sprint 1.5 -- Git Actions + PWA [done]
 
-| Task | 狀態 |
-|------|------|
-| Git commit API | ✅ |
-| Git push API | ✅ |
-| Git pull API | ✅ |
-| Git branch API (create/switch) | ✅ |
-| Discard changes API | ✅ |
-| Client: Quick Actions | ✅ |
-| Client: Commit sheet | ✅ |
-| PWA manifest + service worker | ✅ |
-| Push notifications | ✅ |
-| 連線狀態指示器 | ✅ (WS auto-reconnect，無 StatusBar UI) |
+| Task | Status |
+|------|--------|
+| Git commit API | [done] |
+| Git push API | [done] |
+| Git pull API | [done] |
+| Git branch API (create/switch) | [done] |
+| Discard changes API | [done] |
+| Client: Quick Actions | [done] |
+| Client: Commit sheet | [done] |
+| PWA manifest + service worker | [done] |
+| Push notifications | [done] |
+| Connection status indicator | [done] (WS auto-reconnect, no StatusBar UI) |
 
-**暫緩項目**：
+**Deferred items**:
 - Voice input (Web Speech API) — hook 已建立，完整 UX 待設計
 - Create PR API — Phase 3 再處理
 
-**已知缺口**（Phase 1 標記完成但功能不完整）：
-- QR code 配對 — API 完成，前端只用 dev quick-pair，無 QR 掃碼 UI
-- Diff comment → AI 回饋 — Comment 可儲存，但不會觸發 AI 重新修改
-- Branch 管理 — API 存在，QuickActions 無 branch 選擇/建立 UI
-- Settings 持久化 — UI 存在，大部分設定只存 localStorage
-- Prompt Templates — DB table + 種子資料存在，無 API/UI
-- 裝置管理 — API 存在，Settings 頁面未串接
+**Known gaps** (Phase 1 marked complete but functionality incomplete):
+- QR code pairing -- API complete, frontend only uses dev quick-pair, no QR scan UI
+- Diff comment -> AI feedback -- Comments can be saved, but do not trigger AI re-edit
+- Branch management -- API exists, QuickActions lacks branch selection/creation UI
+- Settings persistence -- UI exists, most settings only stored in localStorage
+- Device management -- API exists, Settings page not wired up
 
 ---
 
-### Sprint 1.6 — Multi-Workspace 並行開發 ✅
+### Sprint 1.6 -- Multi-Workspace Parallel Development [done]
 
-**狀態**：✅ 完成（2026-02-20）
+**Status**: [done] Completed (2026-02-20)
 
-| Task | 狀態 |
-|------|------|
-| Server: 並行 Runner Map（MAX_CONCURRENT_RUNNERS = 3） | ✅ |
-| Server: 所有 API 加 workspaceId 參數 | ✅ |
-| Server: WS 事件加 workspaceId | ✅ |
-| Client: Workspace store 重構（client-side selection） | ✅ |
-| Client: Chat store per-workspace partition | ✅ |
-| Client: API + WebSocket service workspaceId 參數化 | ✅ |
-| Client: WorkspaceTabs 元件 | ✅ |
-| Client: AppLayout 包裝 | ✅ |
-| Client: ConversationSelector | ✅ |
-| Client: Toast 通知 | ✅ |
-| Client: BottomSheet 元件 | ✅ |
-| Docker Compose 雙容器部署 | ✅ |
-| UI 清理：移除多餘導航按鈕 | ✅ |
-| 智慧新增對話（重用空對話） | ✅ |
-| 對話刪除 + 兩步驟確認 | ✅ |
+| Task | Status |
+|------|--------|
+| Server: parallel Runner Map (MAX_CONCURRENT_RUNNERS = 3) | [done] |
+| Server: all APIs accept workspaceId param | [done] |
+| Server: WS events carry workspaceId | [done] |
+| Client: Workspace store refactor (client-side selection) | [done] |
+| Client: Chat store per-workspace partition | [done] |
+| Client: API + WebSocket service workspaceId parameterized | [done] |
+| Client: WorkspaceTabs component | [done] |
+| Client: AppLayout wrapper | [done] |
+| Client: ConversationSelector | [done] |
+| Client: Toast notifications | [done] |
+| Client: BottomSheet component | [done] |
+| Docker Compose dual-container deployment | [done] |
+| UI cleanup: remove redundant navigation buttons | [done] |
+| Smart new conversation (reuse empty conversations) | [done] |
+| Conversation delete + two-step confirmation | [done] |
 
 **架構變更**：
 - `getActiveWorkspace()` → deprecated，改用 explicit `workspaceId`
@@ -134,25 +133,37 @@
 
 ---
 
-## Phase 2 — Task Queue：非同步 Vibe Coding
+## Phase 2 -- Task Queue: Async Vibe Coding
 
-**目標**：可以丟任務給 AI → AI 在背景做 → 你稍後 review。
+**Goal**: queue tasks for AI -> AI works in background -> you review later.
 
-**狀態**：📋 未開始
+**Status**: Partially implemented
 
-| Sprint | 內容 |
-|--------|------|
-| 2.1 | Task CRUD API + in-memory queue + 自動 branch |
-| 2.2 | Task runner（AI 執行 task → 產生 diff → 更新狀態） |
+### Completed
+- Task CRUD API (`server/src/routes/tasks.ts`)
+- In-memory TaskQueue (`server/src/tasks/queue.ts`)
+- ClaudeSdkRunner runner (`server/src/tasks/runner.ts`)
+- Client: TaskCard, KanbanColumn, TaskCreateSheet components
+- Prompt Templates API (`server/src/routes/templates.ts`)
+
+### Remaining
+- Task dependencies + batch create
+- BullMQ + Redis (deferred to later phase)
+- Branch auto-creation per task
+
+| Sprint | Content |
+|--------|---------|
+| 2.1 | Task CRUD API + in-memory queue + auto branch |
+| 2.2 | Task runner (AI executes task -> generates diff -> updates status) |
 | 2.3 | Task dependencies + batch create |
 | 2.4 | Client: Tasks page (Kanban UI) + task create form |
 
-**驗收場景**：
-1. 早上通勤丟 3 個 tasks
-2. AI 按順序/依賴執行
-3. 每個 task 在獨立 branch
-4. 晚上通勤 review → approve → commit
-5. 回家 merge branches
+**Acceptance scenario**:
+1. Queue 3 tasks during morning commute
+2. AI executes in order/dependency
+3. Each task on independent branch
+4. Review during evening commute -> approve -> commit
+5. Merge branches at home
 
 ---
 
@@ -179,23 +190,23 @@
 
 ## 架構決策記錄
 
-### ✅ Claude Agent SDK（而非直接 Anthropic SDK）
+### [adopted] Claude Agent SDK (instead of direct Anthropic SDK)
 - 內建 tools（Read, Write, Edit, Bash, Grep, Glob）
 - 自動讀取 CLAUDE.md
 - Tool use loop 自動管理
 - Permission modes 支援
 
-### ✅ Docker Compose 雙容器（而非單一容器）
+### [adopted] Docker Compose dual-container (instead of single container)
 - Server: Node 22-slim + better-sqlite3 build deps + Claude CLI
 - Client: Node 22-slim + Vite dev server
 - 各自獨立 build/deploy/scale
 
-### ✅ Per-workspace state（而非 global state）
+### [adopted] Per-workspace state (instead of global state)
 - zustand stores 使用 `Record<string, WorkspaceState>` pattern
 - WS 事件都帶 workspaceId
 - Server 支援 3 個並行 AI runner
 
-### ❌ Serverless 不適合
+### [rejected] Serverless is not suitable
 **評估日期**: 2026-02-18
 
 **原因**：
@@ -210,22 +221,22 @@
 
 ## Dogfooding 策略
 
-### 里程碑 1：Chat + Diff ✅
+### Milestone 1: Chat + Diff [done]
 ```
 通勤時用手機 chat → review → （回家 commit）
 ```
 
-### 里程碑 2：Git Actions ✅
+### Milestone 2: Git Actions [done]
 ```
 完整的通勤 coding flow：chat → diff → approve → commit → push
 ```
 
-### 里程碑 3：Multi-Workspace ✅
+### Milestone 3: Multi-Workspace [done]
 ```
 同時操作多個專案，背景並行 AI 處理
 ```
 
-### 里程碑 4：Task Queue（Phase 2 完成後）
+### Milestone 4: Task Queue (after Phase 2 completion)
 ```
 非同步工作流：睡前丟 tasks → 早上通勤 review
 ```

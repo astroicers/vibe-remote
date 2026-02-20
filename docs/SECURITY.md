@@ -22,7 +22,7 @@ Internet ──X──→ Server (localhost:3000) + Client (localhost:5173 via V
 Docker 環境:
 Internet ──X──→ Server (port 8080) + Client (port 8081)
                     │
-Tailscale Network ──→ Server (100.x.y.z:8080 ✓)
+Tailscale Network ──→ Server (100.x.y.z:8080 [allowed])
                     │
                     ├── 手機 (Tailscale app)
                     └── 電腦 (Tailscale daemon)
@@ -245,9 +245,9 @@ const sdkOptions: Options = {
 
 ### Terminal 指令安全
 
-> **Phase 2 / 尚未實作**: `server/src/terminal/` 目錄目前為空。沒有自定義的指令白名單或黑名單。
+> **Note**: The `server/src/terminal/` directory is currently empty. There is no custom command whitelist or blacklist.
 >
-> 目前所有 shell 指令執行都透過 Claude Agent SDK 的內建 `Bash` 工具，其行為受上述權限模式控制。在 `bypassPermissions` 模式下，AI 可自由執行任何 shell 指令。
+> All shell command execution goes through the Claude Agent SDK's built-in `Bash` tool, controlled by the permission mode settings above. In `bypassPermissions` mode, the AI can execute any shell command freely.
 
 ## API 安全
 
@@ -333,15 +333,36 @@ tailscale cert your-machine.tail-xxxxx.ts.net
 
 ```bash
 # .env.example
-ANTHROPIC_API_KEY=sk-ant-...        # Claude API key
-JWT_SECRET=random-32-char-string     # JWT 簽名密鑰
+
+# Claude Agent SDK authentication (primary method)
+CLAUDE_CODE_OAUTH_TOKEN=...          # OAuth token from `claude setup-token`
+CLAUDE_MODEL=claude-sonnet-4-20250514  # Model to use (default)
+CLAUDE_PERMISSION_MODE=bypassPermissions  # default | acceptEdits | bypassPermissions
+
+# JWT
+JWT_SECRET=random-32-char-string     # JWT signing secret (min 32 chars)
+
+# Push notifications (optional in dev)
 VAPID_PUBLIC_KEY=...                 # PWA push notification
 VAPID_PRIVATE_KEY=...                # PWA push notification
-GITHUB_TOKEN=ghp_...                 # (optional) GitHub API for PR creation
+VAPID_SUBJECT=mailto:you@example.com # VAPID subject (email)
+
+# Server
 HOST=0.0.0.0
-PORT=3000
+PORT=3000                            # Docker environment uses 8080
 NODE_ENV=production
-DATA_DIR=./data                      # SQLite DB 位置
+
+# Database
+DATABASE_PATH=./data/vibe-remote.db  # SQLite DB location
+
+# Workspace path mapping (Docker only)
+WORKSPACE_HOST_PATH=/home/ubuntu     # Host path for workspace volumes
+WORKSPACE_CONTAINER_PATH=/workspace  # Container mount point
+
+# Optional
+GITHUB_TOKEN=ghp_...                 # GitHub API for PR creation
 ```
 
-⚠️ `.env` 必須在 `.gitignore` 中，永遠不入 git。
+**Note**: `CLAUDE_CODE_OAUTH_TOKEN` is the primary authentication method for the Claude Agent SDK. It is obtained via `claude setup-token` and replaces the older `ANTHROPIC_API_KEY` approach. The SDK uses this token for OAuth-based authentication.
+
+WARNING: `.env` must be in `.gitignore` and must never be committed to git.

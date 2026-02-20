@@ -78,7 +78,8 @@ vibe-remote/
 │   │   │   ├── index.ts
 │   │   │   ├── manager.ts         # Workspace CRUD + path mapping
 │   │   │   ├── git-ops.ts         # simple-git wrapper
-│   │   │   └── file-tree.ts       # 目錄結構產生器
+│   │   │   ├── file-tree.ts       # 目錄結構產生器
+│   │   │   └── watcher.ts         # File system watcher (chokidar)
 │   │   ├── diff/                  # Diff 解析與管理
 │   │   │   ├── index.ts
 │   │   │   ├── manager.ts         # Diff CRUD
@@ -90,6 +91,8 @@ vibe-remote/
 │   │   │   ├── chat.ts
 │   │   │   ├── diff.ts
 │   │   │   ├── workspaces.ts      # CRUD + git operations
+│   │   │   ├── tasks.ts           # Task CRUD + management
+│   │   │   ├── templates.ts       # Prompt templates
 │   │   │   └── notifications.ts
 │   │   ├── ws/                    # WebSocket event handlers
 │   │   │   ├── index.ts
@@ -106,8 +109,12 @@ vibe-remote/
 │   │   │   └── schema.ts          # CREATE TABLE statements
 │   │   ├── utils/
 │   │   │   └── truncate.ts        # 訊息/檔案截斷工具
-│   │   ├── tasks/                 # Phase 2（目前空目錄）
-│   │   ├── terminal/              # Phase 2（目前空目錄）
+│   │   ├── tasks/                 # Task queue + runner
+│   │   │   ├── index.ts
+│   │   │   ├── manager.ts
+│   │   │   ├── queue.ts
+│   │   │   └── runner.ts
+│   │   ├── terminal/              # Phase 2 — not yet implemented
 │   │   └── test/
 │   │       └── setup.ts           # Vitest setup
 │   ├── Dockerfile                 # Node 22-slim + better-sqlite3 build deps
@@ -128,7 +135,11 @@ vibe-remote/
 │   │   │   ├── AppLayout.tsx      # Layout wrapper（WorkspaceTabs + BottomNav）
 │   │   │   ├── BottomNav.tsx      # 5-tab 底部導覽
 │   │   │   ├── BottomSheet.tsx    # 滑出式面板
+│   │   │   ├── ConfirmDialog.tsx  # 通用確認對話框
 │   │   │   ├── ConversationSelector.tsx  # 對話選擇器
+│   │   │   ├── EmptyState.tsx     # 通用空狀態元件
+│   │   │   ├── PullToRefresh.tsx  # 下拉刷新手勢
+│   │   │   ├── StatusBar.tsx      # 斷線狀態指示條
 │   │   │   ├── Toast.tsx          # Toast 通知
 │   │   │   ├── WorkspaceTabs.tsx  # Workspace 切換 tabs
 │   │   │   ├── chat/              # Chat UI 元件
@@ -137,22 +148,35 @@ vibe-remote/
 │   │   │   │   ├── ChatInput.tsx
 │   │   │   │   ├── TokenUsageCard.tsx
 │   │   │   │   ├── ToolApprovalCard.tsx
+│   │   │   │   ├── AttachButton.tsx       # 附加檔案按鈕
+│   │   │   │   ├── ContextFileSheet.tsx   # 檔案選擇 BottomSheet
+│   │   │   │   ├── FileTree.tsx           # 檔案樹元件
+│   │   │   │   ├── PromptTemplateSheet.tsx # Prompt template 選擇
 │   │   │   │   └── index.ts
 │   │   │   ├── diff/              # Diff review 元件
 │   │   │   │   ├── DiffViewer.tsx
 │   │   │   │   ├── FileList.tsx
 │   │   │   │   ├── ReviewActions.tsx
+│   │   │   │   ├── DiffCommentInput.tsx   # Diff comment 輸入
+│   │   │   │   ├── DiffCommentList.tsx    # Diff comment 列表
 │   │   │   │   └── index.ts
+│   │   │   ├── tasks/             # Task 管理元件
+│   │   │   │   ├── KanbanColumn.tsx       # Kanban 列
+│   │   │   │   ├── TaskCard.tsx           # Task 卡片
+│   │   │   │   └── TaskCreateSheet.tsx    # Task 建立表單
 │   │   │   └── actions/           # Quick Actions 元件
 │   │   │       ├── QuickActions.tsx
 │   │   │       ├── GitStatusCard.tsx
 │   │   │       ├── ActionButton.tsx
+│   │   │       ├── BranchSelector.tsx     # Branch 選擇器
 │   │   │       └── index.ts
 │   │   ├── stores/                # zustand stores
 │   │   │   ├── auth.ts            # JWT + device 狀態
 │   │   │   ├── chat.ts            # Per-workspace 對話（workspaceChats map）
 │   │   │   ├── workspace.ts       # Workspace 列表 + Git state
 │   │   │   ├── diff.ts            # Diff review 狀態
+│   │   │   ├── settings.ts        # App settings（model, theme 等）
+│   │   │   ├── tasks.ts           # Task 管理狀態
 │   │   │   └── toast.ts           # Toast 通知佇列
 │   │   ├── services/
 │   │   │   ├── api.ts             # REST client（fetch wrapper）
@@ -353,10 +377,10 @@ res.status(400).json({
 
 ```typescript
 // 目前使用 console.log / console.error / console.warn
-// 帶 emoji prefix 區分類型:
-console.log('✅ Server started', { port, host });
-console.error('❌ Database error', error.message);
-console.warn('⚠️ No Claude authentication configured');
+// 帶 prefix 區分類型:
+console.log('[INFO] Server started', { port, host });
+console.error('[ERROR] Database error', error.message);
+console.warn('[WARN] No Claude authentication configured');
 ```
 
 ## Vite Proxy 設定
@@ -557,10 +581,47 @@ npm --prefix server run test        # Watch mode
 npm --prefix server run test:run    # Single run
 npm --prefix server run test:coverage
 
-# 現有測試:
-# - server/src/auth/jwt.test.ts
-# - server/src/ws/rate-limit.test.ts
-# - server/src/ws/tool-approval.test.ts
+# Client tests (vitest + React Testing Library)
+npm --prefix client run test        # Watch mode
+npm --prefix client run test:run    # Single run
+```
+
+### 測試現況
+
+**Total: 236 tests（Server 116 + Client 120）**
+
+Server test files (9):
+
+```
+server/src/auth/jwt.test.ts
+server/src/ws/rate-limit.test.ts
+server/src/ws/tool-approval.test.ts
+server/src/workspace/manager.test.ts
+server/src/workspace/watcher.test.ts
+server/src/tasks/queue.test.ts
+server/src/tasks/runner.test.ts
+server/src/routes/tasks.test.ts
+server/src/routes/templates.test.ts
+```
+
+Client test files (15):
+
+```
+client/src/components/ConfirmDialog.test.tsx
+client/src/components/EmptyState.test.tsx
+client/src/components/PullToRefresh.test.tsx
+client/src/components/StatusBar.test.tsx
+client/src/components/Toast.test.tsx
+client/src/components/actions/BranchSelector.test.tsx
+client/src/components/chat/AttachButton.test.tsx
+client/src/components/chat/FileTree.test.tsx
+client/src/components/chat/PromptTemplateSheet.test.tsx
+client/src/components/diff/DiffCommentInput.test.tsx
+client/src/components/tasks/TaskCard.test.tsx
+client/src/pages/ChatPage.test.tsx
+client/src/pages/DiffPage.test.tsx
+client/src/stores/settings.test.ts
+client/src/stores/toast.test.ts
 ```
 
 ### 測試策略
@@ -568,11 +629,12 @@ npm --prefix server run test:coverage
 ```
 Server:
   - Unit tests: vitest
-  - 測試重點: JWT, rate limiting, tool approval, path validation
+  - 測試重點: JWT, rate limiting, tool approval, workspace management,
+              task queue/runner, route handlers, file watcher
 
 Client:
-  - 尚未設定測試框架
-  - 建議: vitest + React Testing Library
+  - Unit tests: vitest + React Testing Library
+  - 測試重點: components, pages, stores
 
 E2E:
   - 尚未設定

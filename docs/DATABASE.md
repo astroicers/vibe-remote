@@ -125,7 +125,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id
 ]
 ```
 
-### tasks — 任務佇列 (Phase 2，先建表)
+### tasks -- Task queue (implemented with in-memory queue)
 
 ```sql
 CREATE TABLE IF NOT EXISTS tasks (
@@ -150,7 +150,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 ```
 
-> **Note**: `priority` 為 TEXT 而非 INTEGER，使用 CHECK constraint 限制值域。`depends_on` 儲存 JSON array（而非 FK reference），允許多重依賴。Phase 2 實作時會加入 task runner 和 queue 機制。
+> **Note**: `priority` 為 TEXT 而非 INTEGER，使用 CHECK constraint 限制值域。`depends_on` 儲存 JSON array（而非 FK reference），允許多重依賴。Task runner and in-memory queue are implemented in `server/src/tasks/`.
 
 ### diff_reviews — Diff 審查
 

@@ -10,14 +10,14 @@ Vibe Remote 是一個 mobile-first PWA，讓工程師在通勤時用手機透過
 
 | 文件 | 用途 | 優先序 |
 |------|------|--------|
-| `docs/ARCHITECTURE.md` | 系統架構、元件關係、技術選型 | 🔴 必讀 |
-| `docs/API_SPEC.md` | 完整 REST + WebSocket API 規格 | 🔴 必讀 |
-| `docs/DATABASE.md` | SQLite schema、資料模型 | 🔴 必讀 |
-| `docs/UI_UX.md` | Mobile UI 設計、元件階層 | 🟡 開發前端時必讀 |
-| `docs/AI_ENGINE.md` | AI context building、tool use | 🟡 開發 AI 模組時必讀 |
-| `docs/SECURITY.md` | 認證、授權、安全設計 | 🟡 開發 auth 時必讀 |
-| `docs/DEVELOPMENT.md` | 開發環境、coding standards | 🟢 參考 |
-| `docs/ROADMAP.md` | 開發階段與驗收標準 | 🟢 參考 |
+| `docs/ARCHITECTURE.md` | 系統架構、元件關係、技術選型 | Required |
+| `docs/API_SPEC.md` | 完整 REST + WebSocket API 規格 | Required |
+| `docs/DATABASE.md` | SQLite schema、資料模型 | Required |
+| `docs/UI_UX.md` | Mobile UI 設計、元件階層 | Recommended (開發前端時必讀) |
+| `docs/AI_ENGINE.md` | AI context building、tool use | Recommended (開發 AI 模組時必讀) |
+| `docs/SECURITY.md` | 認證、授權、安全設計 | Recommended (開發 auth 時必讀) |
+| `docs/DEVELOPMENT.md` | 開發環境、coding standards | Reference |
+| `docs/ROADMAP.md` | 開發階段與驗收標準 | Reference |
 
 ## 技術棧
 
@@ -69,12 +69,19 @@ vibe-remote/
 │       │   ├── manager.ts     # Workspace CRUD + 路徑掃描
 │       │   ├── git-ops.ts     # simple-git wrapper
 │       │   └── file-tree.ts   # 遞迴目錄讀取
+│       ├── tasks/             # Task queue + runner
+│       │   ├── index.ts       # Task module exports
+│       │   ├── manager.ts     # Task CRUD + lifecycle
+│       │   ├── queue.ts       # In-memory TaskQueue
+│       │   └── runner.ts      # ClaudeSdkRunner (AI task execution)
 │       ├── diff/              # Diff parsing + review manager
 │       ├── notifications/     # Web push (VAPID)
 │       ├── routes/            # REST API handlers
 │       │   ├── auth.ts
 │       │   ├── chat.ts
 │       │   ├── diff.ts
+│       │   ├── tasks.ts       # Task CRUD API
+│       │   ├── templates.ts   # Prompt Templates API
 │       │   ├── workspaces.ts  # 含 GET /scan 端點
 │       │   └── notifications.ts
 │       ├── ws/                # WebSocket handlers
@@ -106,6 +113,7 @@ vibe-remote/
 │       │   ├── Toast.tsx             # Toast 通知
 │       │   ├── chat/                 # ChatInput, MessageBubble, MessageList, etc.
 │       │   ├── diff/                 # DiffViewer, FileList, ReviewActions
+│       │   ├── tasks/               # TaskCard, KanbanColumn, TaskCreateSheet
 │       │   └── actions/              # QuickActions, GitStatusCard, ActionButton
 │       ├── hooks/
 │       │   ├── usePushNotifications.ts
@@ -120,6 +128,8 @@ vibe-remote/
 │       │   ├── chat.ts          # Per-workspace chat partition
 │       │   ├── diff.ts          # Per-workspace diff state
 │       │   ├── auth.ts          # Auth token 管理
+│       │   ├── settings.ts      # Settings state
+│       │   ├── tasks.ts         # Task queue state
 │       │   └── toast.ts         # Toast 通知
 │       ├── styles/
 │       │   └── globals.css      # Tailwind imports + custom styles
@@ -183,10 +193,10 @@ vibe-remote/
 
 ## 常見陷阱
 
-- ⚠️ `better-sqlite3` 是 native module，Docker 需要 python3 + make + g++ build 環境
-- ⚠️ Claude Agent SDK 需要 `@anthropic-ai/claude-code` CLI 全域安裝
-- ⚠️ Claude CLI 以 root 執行會拒絕 `--dangerously-skip-permissions`，Docker 中用 `node` user
-- ⚠️ PWA push notification 在 iOS 要 iOS 16.4+，需要用戶手動「加到主畫面」
-- ⚠️ Docker workspace 路徑映射：host path ≠ container path，用 `WORKSPACE_HOST_PATH` / `WORKSPACE_CONTAINER_PATH` 設定
-- ⚠️ 同一 conversation 不允許兩個 runner 同時執行（Map key 檢查防 race condition）
-- ⚠️ `MAX_CONCURRENT_RUNNERS = 3` 限制並行 AI 處理，每個 runner spawn 子進程消耗記憶體
+- WARNING: `better-sqlite3` 是 native module，Docker 需要 python3 + make + g++ build 環境
+- WARNING: Claude Agent SDK 需要 `@anthropic-ai/claude-code` CLI 全域安裝
+- WARNING: Claude CLI 以 root 執行會拒絕 `--dangerously-skip-permissions`，Docker 中用 `node` user
+- WARNING: PWA push notification 在 iOS 要 iOS 16.4+，需要用戶手動「加到主畫面」
+- WARNING: Docker workspace 路徑映射：host path ≠ container path，用 `WORKSPACE_HOST_PATH` / `WORKSPACE_CONTAINER_PATH` 設定
+- WARNING: 同一 conversation 不允許兩個 runner 同時執行（Map key 檢查防 race condition）
+- WARNING: `MAX_CONCURRENT_RUNNERS = 3` 限制並行 AI 處理，每個 runner spawn 子進程消耗記憶體
