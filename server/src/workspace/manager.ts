@@ -30,7 +30,6 @@ export interface Workspace {
   id: string;
   name: string;
   path: string;
-  isActive: boolean;
   systemPrompt: string | null;
   createdAt: string;
 }
@@ -38,14 +37,13 @@ export interface Workspace {
 export function listWorkspaces(): Workspace[] {
   const db = getDb();
   const rows = db.prepare(`
-    SELECT id, name, path, is_active, system_prompt, created_at
+    SELECT id, name, path, system_prompt, created_at
     FROM workspaces
-    ORDER BY is_active DESC, name ASC
+    ORDER BY name ASC
   `).all() as Array<{
     id: string;
     name: string;
     path: string;
-    is_active: number;
     system_prompt: string | null;
     created_at: string;
   }>;
@@ -54,7 +52,6 @@ export function listWorkspaces(): Workspace[] {
     id: row.id,
     name: row.name,
     path: row.path,
-    isActive: row.is_active === 1,
     systemPrompt: row.system_prompt,
     createdAt: row.created_at,
   }));
@@ -63,13 +60,12 @@ export function listWorkspaces(): Workspace[] {
 export function getWorkspace(id: string): Workspace | null {
   const db = getDb();
   const row = db.prepare(`
-    SELECT id, name, path, is_active, system_prompt, created_at
+    SELECT id, name, path, system_prompt, created_at
     FROM workspaces WHERE id = ?
   `).get(id) as {
     id: string;
     name: string;
     path: string;
-    is_active: number;
     system_prompt: string | null;
     created_at: string;
   } | undefined;
@@ -80,37 +76,6 @@ export function getWorkspace(id: string): Workspace | null {
     id: row.id,
     name: row.name,
     path: row.path,
-    isActive: row.is_active === 1,
-    systemPrompt: row.system_prompt,
-    createdAt: row.created_at,
-  };
-}
-
-/**
- * @deprecated Use explicit workspaceId parameter instead. This function relies on the
- * single-active-workspace model which is being replaced by multi-workspace support.
- */
-export function getActiveWorkspace(): Workspace | null {
-  const db = getDb();
-  const row = db.prepare(`
-    SELECT id, name, path, is_active, system_prompt, created_at
-    FROM workspaces WHERE is_active = 1 LIMIT 1
-  `).get() as {
-    id: string;
-    name: string;
-    path: string;
-    is_active: number;
-    system_prompt: string | null;
-    created_at: string;
-  } | undefined;
-
-  if (!row) return null;
-
-  return {
-    id: row.id,
-    name: row.name,
-    path: row.path,
-    isActive: true,
     systemPrompt: row.system_prompt,
     createdAt: row.created_at,
   };
@@ -162,30 +127,9 @@ export function registerWorkspace(input: RegisterWorkspaceInput): Workspace {
     id,
     name,
     path: absolutePath,
-    isActive: input.setActive ?? false,
     systemPrompt: null,
     createdAt: new Date().toISOString(),
   };
-}
-
-/**
- * @deprecated Use explicit workspaceId parameter instead. This function relies on the
- * single-active-workspace model which is being replaced by multi-workspace support.
- */
-export function setActiveWorkspace(id: string): Workspace {
-  const db = getDb();
-
-  // Check workspace exists
-  const workspace = getWorkspace(id);
-  if (!workspace) {
-    throw new Error(`Workspace not found: ${id}`);
-  }
-
-  // Deactivate all, then activate this one
-  db.prepare('UPDATE workspaces SET is_active = 0').run();
-  db.prepare('UPDATE workspaces SET is_active = 1 WHERE id = ?').run(id);
-
-  return { ...workspace, isActive: true };
 }
 
 export function updateWorkspace(id: string, updates: { name?: string; systemPrompt?: string }): Workspace {

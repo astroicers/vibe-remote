@@ -1,37 +1,40 @@
-FROM node:22-slim
+# ── Stage 1: Build client ──
+FROM node:22-slim AS client-build
+WORKDIR /app/client
+COPY client/package*.json ./
+RUN npm ci
+COPY client/ .
+RUN npm run build
 
+# ── Stage 2: Build server ──
+FROM node:22-slim AS server-build
 WORKDIR /app
-
-# Install build dependencies for better-sqlite3
-RUN apt-get update && apt-get install -y \
-    python3 \
-    make \
-    g++ \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
+# Install build deps for better-sqlite3 native module
+RUN apt-get update && apt-get install -y python3 make g++ git && rm -rf /var/lib/apt/lists/*
 # Install Claude Code CLI (required by Agent SDK)
 RUN npm install -g @anthropic-ai/claude-code
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
+COPY server/package*.json ./
 RUN npm ci
+COPY server/ .
 
-# Copy source
-COPY . .
+# ── Stage 3: Runtime ──
+FROM node:22-slim
+WORKDIR /app
 
-# Create data directory and workspace mount point
-# Use built-in 'node' user (uid 1000) to match host 'ubuntu' user (uid 1000)
-RUN mkdir -p data /workspace && \
-    chown -R node:node /app /workspace
+# Install runtime deps for better-sqlite3
+RUN apt-get update && apt-get install -y python3 make g++ git curl && rm -rf /var/lib/apt/lists/*
+RUN npm install -g @anthropic-ai/claude-code
 
-# Expose port (overridable via PORT env var)
+COPY --from=server-build /app ./
+COPY --from=client-build /app/client/dist /client/dist
+
+# Create data dir and workspace mount
+RUN mkdir -p data /workspace && chown -R node:node /app /workspace
+
 EXPOSE 8080
-
-# Run as non-root user (required: Claude CLI refuses --dangerously-skip-permissions as root)
 USER node
 
-# Start server
+# Set production defaults
+ENV NODE_ENV=production
+
 CMD ["npx", "tsx", "src/index.ts"]

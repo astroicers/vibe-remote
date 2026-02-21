@@ -1,6 +1,9 @@
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
+import { useWorkspaceStore } from '../stores/workspace';
+import { useDiffStore } from '../stores/diff';
+import { useTaskStore } from '../stores/tasks';
 
 interface NavItemProps {
   to: string;
@@ -66,9 +69,12 @@ const SettingsIcon = (
 );
 
 export function BottomNav() {
-  // TODO: Get badge counts from store
-  const diffBadge = 0;
-  const tasksBadge = 0;
+  const { selectedWorkspaceId } = useWorkspaceStore();
+  const diffState = useDiffStore((s) => selectedWorkspaceId ? (s.diffByWorkspace[selectedWorkspaceId] || { reviews: [] }) : { reviews: [] });
+  const taskState = useTaskStore((s) => selectedWorkspaceId ? (s.tasksByWorkspace[selectedWorkspaceId] || { tasks: [] }) : { tasks: [] });
+
+  const diffBadge = diffState.reviews.filter((r: { status: string }) => r.status === 'pending').length;
+  const tasksBadge = taskState.tasks.filter((t: { status: string }) => t.status === 'queued' || t.status === 'running').length;
 
   return (
     <nav className="bottom-nav">

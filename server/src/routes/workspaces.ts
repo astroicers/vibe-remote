@@ -7,9 +7,7 @@ import { config } from '../config.js';
 import {
   listWorkspaces,
   getWorkspace,
-  getActiveWorkspace,
   registerWorkspace,
-  setActiveWorkspace,
   updateWorkspace,
   removeWorkspace,
   getFileTree,
@@ -35,21 +33,6 @@ router.use(authMiddleware);
 router.get('/', (_req, res) => {
   const workspaces = listWorkspaces();
   res.json(workspaces);
-});
-
-// Get active workspace
-router.get('/active', (_req, res) => {
-  const workspace = getActiveWorkspace();
-
-  if (!workspace) {
-    res.status(404).json({
-      error: 'No active workspace',
-      code: 'NO_ACTIVE_WORKSPACE',
-    });
-    return;
-  }
-
-  res.json(workspace);
 });
 
 // Scan a directory for git repositories (immediate subdirectories with .git)
@@ -177,19 +160,6 @@ router.post('/', (req, res) => {
     res.status(400).json({
       error: error instanceof Error ? error.message : 'Failed to register workspace',
       code: 'REGISTRATION_ERROR',
-    });
-  }
-});
-
-// Set active workspace
-router.post('/:id/activate', (req, res) => {
-  try {
-    const workspace = setActiveWorkspace(req.params.id);
-    res.json(workspace);
-  } catch (error) {
-    res.status(404).json({
-      error: error instanceof Error ? error.message : 'Workspace not found',
-      code: 'NOT_FOUND',
     });
   }
 });

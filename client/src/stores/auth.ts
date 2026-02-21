@@ -12,9 +12,14 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  pairingCode: string | null;
+  pairingQR: string | null;
+  pairingExpiresAt: string | null;
 
   // Actions
   devQuickPair: (deviceName: string) => Promise<void>;
+  startPairing: () => Promise<void>;
+  completePairing: (code: string, deviceName: string) => Promise<void>;
   checkAuth: () => Promise<void>;
   logout: () => void;
 }
@@ -28,6 +33,9 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      pairingCode: null,
+      pairingQR: null,
+      pairingExpiresAt: null,
 
       devQuickPair: async (deviceName: string) => {
         set({ isLoading: true, error: null });
@@ -49,6 +57,48 @@ export const useAuthStore = create<AuthState>()(
           set({
             isLoading: false,
             error: error instanceof Error ? error.message : 'Authentication failed',
+          });
+        }
+      },
+
+      startPairing: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const result = await auth.pairingStart();
+          set({
+            pairingCode: result.code,
+            pairingQR: result.qrCode,
+            pairingExpiresAt: result.expiresAt,
+            isLoading: false,
+          });
+        } catch (error) {
+          set({
+            isLoading: false,
+            error: error instanceof Error ? error.message : 'Failed to start pairing',
+          });
+        }
+      },
+
+      completePairing: async (code: string, deviceName: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const result = await auth.pairingComplete(code, deviceName);
+          localStorage.setItem('auth_token', result.token);
+          set({
+            token: result.token,
+            deviceId: result.deviceId,
+            deviceName,
+            isAuthenticated: true,
+            isLoading: false,
+            pairingCode: null,
+            pairingQR: null,
+            pairingExpiresAt: null,
+          });
+          ws.connect();
+        } catch (error) {
+          set({
+            isLoading: false,
+            error: error instanceof Error ? error.message : 'Pairing failed',
           });
         }
       },

@@ -5,6 +5,7 @@ import { AppLayout } from '../components/AppLayout';
 import { BottomSheet } from '../components/BottomSheet';
 import { useDiffStore } from '../stores/diff';
 import { useWorkspaceStore } from '../stores/workspace';
+import { useChatStore } from '../stores/chat';
 
 export function DiffPage() {
   const navigate = useNavigate();
@@ -33,7 +34,10 @@ export function DiffPage() {
   const wsDiff = getDiffState(wsId);
   const { currentDiff, currentReview, selectedFile } = wsDiff;
 
+  const { createConversation, sendMessage } = useChatStore();
+
   const [showFileSheet, setShowFileSheet] = useState(false);
+  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
 
   // Load diff or review on mount
   useEffect(() => {
@@ -75,6 +79,34 @@ export function DiffPage() {
   };
   const goToNextFile = () => {
     if (hasNext && wsId) selectFile(wsId, files[currentIndex + 1]);
+  };
+
+  const handleRejectAll = async () => {
+    if (!wsId) return;
+    await rejectAll(wsId);
+    const review = getDiffState(wsId).currentReview;
+    const userComments = review?.comments.filter((c) => c.author === 'user') || [];
+    if (userComments.length > 0) {
+      setShowFeedbackPrompt(true);
+    }
+  };
+
+  const handleSendFeedbackToAI = async () => {
+    if (!wsId) return;
+    const review = currentReview;
+    if (!review) return;
+    const userComments = review.comments.filter((c) => c.author === 'user');
+    const formatted = userComments
+      .map((c) => {
+        const linePart = c.lineNumber ? `, line ${c.lineNumber}` : '';
+        return `- ${c.content} (file: ${c.filePath}${linePart})`;
+      })
+      .join('\n');
+    const message = `Please address the following review feedback and make the requested changes:\n\n${formatted}`;
+    await createConversation(wsId);
+    sendMessage(wsId, message);
+    setShowFeedbackPrompt(false);
+    navigate('/chat');
   };
 
   const handleCreateReview = async () => {
@@ -275,7 +307,7 @@ export function DiffPage() {
             <ReviewActions
               status={currentReview.status}
               onApproveAll={() => wsId && approveAll(wsId)}
-              onRejectAll={() => wsId && rejectAll(wsId)}
+              onRejectAll={handleRejectAll}
               isLoading={isLoading}
             />
           ) : (
@@ -304,6 +336,33 @@ export function DiffPage() {
           }}
         />
       </BottomSheet>
+
+      {/* Feedback Prompt Dialog */}
+      {showFeedbackPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowFeedbackPrompt(false)} />
+          <div className="relative bg-bg-elevated rounded-2xl p-6 mx-4 w-full max-w-sm">
+            <h3 className="text-lg font-semibold text-text-primary mb-2">Send Feedback to AI?</h3>
+            <p className="text-sm text-text-secondary mb-6">
+              Your review has comments. Would you like to send them to AI for re-editing?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowFeedbackPrompt(false)}
+                className="flex-1 py-2.5 bg-bg-tertiary text-text-secondary rounded-xl text-sm font-medium hover:bg-bg-surface transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendFeedbackToAI}
+                className="flex-1 py-2.5 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 transition-colors"
+              >
+                Send to AI
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

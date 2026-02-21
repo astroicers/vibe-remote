@@ -15,7 +15,19 @@ export function ChatPage() {
   const [showFileSheet, setShowFileSheet] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [prefillText, setPrefillText] = useState('');
-  const { isAuthenticated, checkAuth } = useAuthStore();
+  const [deviceNameInput, setDeviceNameInput] = useState('');
+  const {
+    isAuthenticated,
+    isLoading,
+    error: authError,
+    checkAuth,
+    devQuickPair,
+    startPairing,
+    completePairing,
+    pairingCode,
+    pairingQR,
+    pairingExpiresAt,
+  } = useAuthStore();
 
   const {
     selectedWorkspaceId,
@@ -62,19 +74,8 @@ export function ChatPage() {
     checkAuth();
   }, [checkAuth]);
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isAuthenticated) {
-      const devLogin = async () => {
-        try {
-          await useAuthStore.getState().devQuickPair('Vibe Remote Dev');
-        } catch (e) {
-          console.error('Dev login failed:', e);
-        }
-      };
-      devLogin();
-    }
-  }, [isAuthenticated]);
+  // Auth gate — show pairing UI when not authenticated
+  // (replaces the old auto-devLogin behavior)
 
   // Load workspaces on auth
   useEffect(() => {
@@ -118,6 +119,85 @@ export function ChatPage() {
   const currentConv = conversations.find((c) => c.id === currentConversationId);
   const headerTitle = workspace?.name || 'Vibe Remote';
   const headerSubtitle = currentConv?.title || 'New Conversation';
+
+  // When not authenticated
+  if (!isAuthenticated) {
+    return (
+      <AppLayout>
+        <div className="flex-1 flex flex-col items-center justify-center px-6">
+          <h1 className="text-xl font-bold text-text-primary mb-2">Vibe Remote</h1>
+          <p className="text-sm text-text-secondary mb-8 text-center">
+            Pair your device to start coding
+          </p>
+
+          {/* Dev quick pair (development only) */}
+          {import.meta.env.DEV && (
+            <button
+              onClick={() => devQuickPair('Vibe Remote Dev')}
+              className="mb-6 px-6 py-3 bg-bg-tertiary text-text-secondary rounded-xl text-sm font-medium hover:bg-bg-surface transition-colors"
+            >
+              Dev Quick Pair
+            </button>
+          )}
+
+          {/* QR Pairing Flow */}
+          {!pairingCode ? (
+            <button
+              onClick={() => startPairing()}
+              disabled={isLoading}
+              className="px-6 py-3 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 disabled:opacity-50 transition-colors"
+            >
+              {isLoading ? 'Generating...' : 'Generate Pairing Code'}
+            </button>
+          ) : (
+            <div className="w-full max-w-sm space-y-6 text-center">
+              {/* QR Code Image */}
+              {pairingQR && (
+                <div className="flex justify-center">
+                  <img src={pairingQR} alt="Pairing QR Code" className="w-48 h-48 rounded-xl" />
+                </div>
+              )}
+
+              {/* Pairing Code */}
+              <div>
+                <p className="text-xs text-text-muted mb-1">Or enter this code on the server</p>
+                <p className="text-3xl font-mono font-bold text-accent tracking-widest">{pairingCode}</p>
+              </div>
+
+              {/* Manual completion */}
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Device name"
+                  value={deviceNameInput}
+                  onChange={(e) => setDeviceNameInput(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-bg-surface border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+                />
+                <button
+                  onClick={() => completePairing(pairingCode, deviceNameInput || 'Vibe Remote')}
+                  disabled={isLoading}
+                  className="w-full px-4 py-2.5 bg-accent text-white rounded-xl text-sm font-medium hover:bg-accent/90 disabled:opacity-50 transition-colors"
+                >
+                  {isLoading ? 'Pairing...' : 'Complete Pairing'}
+                </button>
+              </div>
+
+              {/* Expiry */}
+              {pairingExpiresAt && (
+                <p className="text-xs text-text-muted">
+                  Code expires at {new Date(pairingExpiresAt).toLocaleTimeString()}
+                </p>
+              )}
+            </div>
+          )}
+
+          {authError && (
+            <p className="mt-4 text-sm text-danger">{authError}</p>
+          )}
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

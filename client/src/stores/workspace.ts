@@ -37,6 +37,7 @@ interface WorkspaceState {
   loadWorkspaces: () => Promise<void>;
   selectWorkspace: (id: string) => void;
   registerWorkspace: (path: string, name?: string) => Promise<void>;
+  updateWorkspace: (id: string, data: { name?: string; systemPrompt?: string }) => Promise<void>;
 
   // Git actions — all take workspaceId explicitly
   loadGitStatus: (workspaceId: string) => Promise<void>;
@@ -130,6 +131,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to register workspace',
       });
+    }
+  },
+
+  updateWorkspace: async (id: string, data: { name?: string; systemPrompt?: string }) => {
+    set({ isLoading: true, error: null });
+    try {
+      await workspaces.update(id, data);
+      set({ isLoading: false });
+      get().loadWorkspaces();
+      useToastStore.getState().addToast('Workspace updated', 'success');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to update workspace';
+      set({ isLoading: false, error: msg });
+      useToastStore.getState().addToast(msg, 'error');
     }
   },
 

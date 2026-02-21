@@ -69,6 +69,12 @@ export const auth = {
       { method: 'POST' }
     ),
 
+  pairingComplete: (code: string, deviceName: string) =>
+    request<{ token: string; deviceId: string }>('/auth/pairing/complete', {
+      method: 'POST',
+      json: { code, deviceName },
+    }),
+
   getDevices: () =>
     request<Array<{ id: string; name: string; last_seen_at: string; created_at: string }>>('/auth/devices'),
 
@@ -151,6 +157,9 @@ export const workspaces = {
       method: 'POST',
       json: { files },
     }),
+
+  update: (id: string, data: { name?: string; systemPrompt?: string }) =>
+    request<Workspace>(`/workspaces/${id}`, { method: 'PATCH', json: data }),
 };
 
 export interface FileNode {

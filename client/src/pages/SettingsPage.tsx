@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { useSettingsStore, VOICE_LANGUAGES } from '../stores/settings';
 import { useAuthStore } from '../stores/auth';
+import { useWorkspaceStore } from '../stores/workspace';
 import { auth } from '../services/api';
 import { ws } from '../services/websocket';
 import { AppLayout } from '../components/AppLayout';
@@ -103,6 +104,19 @@ export function SettingsPage() {
     setAutoCommitMsg,
     setProjectsPath,
   } = useSettingsStore();
+
+  // Workspace store
+  const { selectedWorkspaceId, workspaceList, updateWorkspace } = useWorkspaceStore();
+  const selectedWorkspace = workspaceList.find((w) => w.id === selectedWorkspaceId);
+
+  // System prompt editor state
+  const [systemPrompt, setSystemPrompt] = useState(selectedWorkspace?.systemPrompt || '');
+  const [promptDirty, setPromptDirty] = useState(false);
+
+  useEffect(() => {
+    setSystemPrompt(selectedWorkspace?.systemPrompt || '');
+    setPromptDirty(false);
+  }, [selectedWorkspace?.id, selectedWorkspace?.systemPrompt]);
 
   // Auth store
   const authStore = useAuthStore();
@@ -272,6 +286,34 @@ export function SettingsPage() {
                 className="w-full px-3 py-2 bg-bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
               />
             </div>
+            {selectedWorkspace && (
+              <div className="mt-3">
+                <label className="block text-sm font-medium text-text-primary mb-1">
+                  System Prompt
+                  <span className="text-xs text-text-muted ml-1">({selectedWorkspace.name})</span>
+                </label>
+                <p className="text-xs text-text-muted mb-2">Custom instructions for AI when working in this workspace.</p>
+                <textarea
+                  value={systemPrompt}
+                  onChange={(e) => { setSystemPrompt(e.target.value); setPromptDirty(true); }}
+                  placeholder="e.g., Always use TypeScript strict mode..."
+                  rows={4}
+                  className="w-full px-3 py-2 bg-bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent resize-none"
+                />
+                {promptDirty && (
+                  <button
+                    onClick={async () => {
+                      if (!selectedWorkspaceId) return;
+                      await updateWorkspace(selectedWorkspaceId, { systemPrompt });
+                      setPromptDirty(false);
+                    }}
+                    className="mt-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:bg-accent/90 transition-colors"
+                  >
+                    Save
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </section>
 
