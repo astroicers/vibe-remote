@@ -38,7 +38,7 @@ export function TaskCreateSheet({ isOpen, onClose, onSubmit, isLoading }: TaskCr
       <form onSubmit={handleSubmit} className="px-4 py-3 space-y-4">
         {/* Title */}
         <div className="space-y-1.5">
-          <label htmlFor="task-title" className="text-xs font-medium text-text-secondary">
+          <label htmlFor="task-title" className="text-sm font-medium text-text-secondary">
             Title
           </label>
           <input
@@ -54,7 +54,7 @@ export function TaskCreateSheet({ isOpen, onClose, onSubmit, isLoading }: TaskCr
 
         {/* Description */}
         <div className="space-y-1.5">
-          <label htmlFor="task-description" className="text-xs font-medium text-text-secondary">
+          <label htmlFor="task-description" className="text-sm font-medium text-text-secondary">
             Description
           </label>
           <textarea
@@ -69,7 +69,7 @@ export function TaskCreateSheet({ isOpen, onClose, onSubmit, isLoading }: TaskCr
 
         {/* Priority */}
         <div className="space-y-1.5">
-          <label htmlFor="task-priority" className="text-xs font-medium text-text-secondary">
+          <label htmlFor="task-priority" className="text-sm font-medium text-text-secondary">
             Priority
           </label>
           <select

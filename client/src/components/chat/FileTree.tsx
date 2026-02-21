@@ -55,7 +55,7 @@ function FileTreeNode({ node, selectedPaths, onToggle, depth }: FileTreeNodeProp
   return (
     <div role="treeitem" aria-expanded={isDirectory ? expanded : undefined}>
       <div
-        className="flex items-center py-1.5 px-2 rounded-lg hover:bg-bg-tertiary cursor-pointer"
+        className="flex items-center py-2.5 px-2 rounded-lg hover:bg-bg-tertiary cursor-pointer"
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={handleClick}
       >
@@ -96,7 +96,7 @@ function FileTreeNode({ node, selectedPaths, onToggle, depth }: FileTreeNodeProp
               checked={isSelected}
               onChange={() => onToggle(node.path)}
               onClick={(e) => e.stopPropagation()}
-              className="w-4 h-4 mr-2 rounded border-border accent-accent"
+              className="w-5 h-5 mr-2 rounded border-border accent-accent"
               aria-label={`Select ${node.name}`}
             />
 

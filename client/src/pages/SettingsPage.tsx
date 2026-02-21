@@ -78,13 +78,13 @@ function Toggle({
   return (
     <button
       onClick={() => onChange(!enabled)}
-      className={`w-12 h-7 rounded-full transition-colors ${
+      className={`w-14 h-8 rounded-full transition-colors ${
         enabled ? 'bg-accent' : 'bg-bg-tertiary'
       }`}
     >
       <div
-        className={`w-5 h-5 rounded-full bg-white shadow transition-transform mx-1 ${
-          enabled ? 'translate-x-5' : 'translate-x-0'
+        className={`w-6 h-6 rounded-full bg-white shadow transition-transform mx-1 ${
+          enabled ? 'translate-x-6' : 'translate-x-0'
         }`}
       />
     </button>
@@ -200,7 +200,7 @@ export function SettingsPage() {
       <main className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
         {/* Connection Section */}
         <section>
-          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Connection</h2>
+          <h2 className="text-sm font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Connection</h2>
           <div className="space-y-2">
             <div className="p-4 bg-bg-secondary rounded-xl space-y-3">
               <div className="flex items-center justify-between">
@@ -226,7 +226,7 @@ export function SettingsPage() {
 
         {/* Devices Section */}
         <section>
-          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Devices</h2>
+          <h2 className="text-sm font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Devices</h2>
           <div className="space-y-2">
             {devicesLoading ? (
               <div className="flex items-center justify-center py-6">
@@ -273,7 +273,7 @@ export function SettingsPage() {
 
         {/* Workspace Section */}
         <section>
-          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Workspace</h2>
+          <h2 className="text-sm font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Workspace</h2>
           <div className="p-4 bg-bg-secondary rounded-xl space-y-3">
             <div>
               <label className="block text-sm font-medium text-text-primary mb-1">Projects Path</label>
@@ -283,7 +283,7 @@ export function SettingsPage() {
                 value={projectsPath}
                 onChange={(e) => setProjectsPath(e.target.value)}
                 placeholder="/home/ubuntu"
-                className="w-full px-3 py-2 bg-bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+                className="w-full px-3 py-2 min-h-[44px] bg-bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
               />
             </div>
             {selectedWorkspace && (
@@ -319,7 +319,7 @@ export function SettingsPage() {
 
         {/* AI Section */}
         <section>
-          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">AI Model</h2>
+          <h2 className="text-sm font-medium text-text-muted uppercase tracking-wider px-1 mb-3">AI Model</h2>
           <div className="space-y-2">
             <button
               onClick={() => setModel('sonnet')}
@@ -369,7 +369,7 @@ export function SettingsPage() {
 
         {/* Input Section */}
         <section>
-          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Input</h2>
+          <h2 className="text-sm font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Input</h2>
           <div className="space-y-2">
             <SettingItem
               icon={<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M8.25 4.5a3.75 3.75 0 1 1 7.5 0v8.25a3.75 3.75 0 1 1-7.5 0V4.5Z" /><path d="M6 10.5a.75.75 0 0 1 .75.75v1.5a5.25 5.25 0 1 0 10.5 0v-1.5a.75.75 0 0 1 1.5 0v1.5a6.751 6.751 0 0 1-6 6.709v2.291h3a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1 0-1.5h3v-2.291a6.751 6.751 0 0 1-6-6.709v-1.5A.75.75 0 0 1 6 10.5Z" /></svg>}
@@ -403,7 +403,7 @@ export function SettingsPage() {
 
         {/* Notifications Section */}
         <section>
-          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Notifications</h2>
+          <h2 className="text-sm font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Notifications</h2>
           <div className="space-y-2">
             <SettingItem
               icon={<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M5.25 9a6.75 6.75 0 0 1 13.5 0v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 0 1-.297 1.206c-1.544.57-3.16.99-4.831 1.243a3.75 3.75 0 1 1-7.48 0 24.585 24.585 0 0 1-4.831-1.244.75.75 0 0 1-.298-1.205A8.217 8.217 0 0 0 5.25 9.75V9Zm4.502 8.9a2.25 2.25 0 1 0 4.496 0 25.057 25.057 0 0 1-4.496 0Z" clipRule="evenodd" /></svg>}
@@ -431,7 +431,7 @@ export function SettingsPage() {
 
         {/* Git Section */}
         <section>
-          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Git</h2>
+          <h2 className="text-sm font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Git</h2>
           <div className="space-y-2">
             <SettingItem
               icon={<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M4.848 2.771A49.144 49.144 0 0 1 12 2.25c2.43 0 4.817.178 7.152.52 1.978.292 3.348 2.024 3.348 3.97v6.02c0 1.946-1.37 3.678-3.348 3.97a48.901 48.901 0 0 1-3.476.383.39.39 0 0 0-.297.17l-2.755 4.133a.75.75 0 0 1-1.248 0l-2.755-4.133a.39.39 0 0 0-.297-.17 48.9 48.9 0 0 1-3.476-.384c-1.978-.29-3.348-2.024-3.348-3.97V6.741c0-1.946 1.37-3.68 3.348-3.97Z" clipRule="evenodd" /></svg>}
@@ -445,7 +445,7 @@ export function SettingsPage() {
 
         {/* About Section */}
         <section>
-          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">About</h2>
+          <h2 className="text-sm font-medium text-text-muted uppercase tracking-wider px-1 mb-3">About</h2>
           <div className="space-y-2">
             <div className="flex items-center gap-4 p-4 bg-bg-secondary rounded-xl">
               <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
@@ -464,7 +464,7 @@ export function SettingsPage() {
 
         {/* Account Section */}
         <section>
-          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Account</h2>
+          <h2 className="text-sm font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Account</h2>
           <div className="space-y-2">
             <button
               onClick={() => setShowLogoutConfirm(true)}

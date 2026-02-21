@@ -83,6 +83,7 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
           transform: `translateY(${pullDistance}px)`,
           opacity,
           transition: state === 'idle' ? 'transform 0.2s ease, opacity 0.2s ease' : undefined,
+          willChange: 'transform',
         }}
       >
         <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
@@ -93,6 +94,7 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
         style={{
           transform: `translateY(${pullDistance}px)`,
           transition: state === 'idle' ? 'transform 0.2s ease' : undefined,
+          willChange: 'transform',
         }}
       >
         {children}

@@ -48,7 +48,7 @@ export function WorkspaceTabs() {
             key={ws.id}
             ref={isSelected ? selectedRef : undefined}
             onClick={() => selectWorkspace(ws.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
               isSelected
                 ? 'bg-accent/15 text-accent border border-accent/30'
                 : 'bg-bg-secondary text-text-secondary border border-transparent hover:bg-bg-tertiary'

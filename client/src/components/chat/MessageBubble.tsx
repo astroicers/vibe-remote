@@ -12,9 +12,9 @@ function MessageBubbleComponent({ role, content, isStreaming }: MessageBubblePro
   const isUser = role === 'user';
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3 ${isUser ? 'animate-msg-in-right' : 'animate-msg-in-left'}`}>
       <div
-        className={`max-w-[85%] px-4 py-3 ${
+        className={`${isUser ? 'max-w-[85%]' : 'max-w-[92%]'} px-4 py-3 ${
           isUser
             ? 'bg-accent-muted text-text-primary rounded-[16px_16px_4px_16px]'
             : 'bg-bg-secondary text-text-primary rounded-[4px_16px_16px_16px]'
@@ -61,7 +61,7 @@ function MessageBubbleComponent({ role, content, isStreaming }: MessageBubblePro
 
         {/* Streaming indicator */}
         {isStreaming && (
-          <span className="inline-block w-2 h-4 ml-1 bg-accent animate-pulse rounded-sm" />
+          <span className="inline-block w-2.5 h-5 ml-1 bg-accent animate-pulse rounded-sm" />
         )}
       </div>
     </div>

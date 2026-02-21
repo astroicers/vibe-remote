@@ -38,7 +38,7 @@ export function ReviewActions({
           <button
             onClick={onRejectAll}
             disabled={isLoading}
-            className="px-4 py-2 bg-danger/20 text-danger rounded-lg text-sm font-medium hover:bg-danger/30 disabled:opacity-50 transition-colors"
+            className="px-4 py-3 min-h-[44px] bg-danger/20 text-danger rounded-lg text-sm font-medium hover:bg-danger/30 disabled:opacity-50 transition-colors"
           >
             Reject All
           </button>
@@ -46,7 +46,7 @@ export function ReviewActions({
           <button
             onClick={onApproveAll}
             disabled={isLoading}
-            className="px-4 py-2 bg-success text-white rounded-lg text-sm font-medium hover:bg-success/90 disabled:opacity-50 transition-colors"
+            className="px-4 py-3 min-h-[44px] bg-success text-white rounded-lg text-sm font-medium hover:bg-success/90 disabled:opacity-50 transition-colors"
           >
             Approve All
           </button>

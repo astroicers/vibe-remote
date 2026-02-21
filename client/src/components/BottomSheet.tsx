@@ -66,10 +66,11 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
         ref={sheetRef}
         className="fixed inset-x-0 bottom-0 z-50 bg-bg-elevated rounded-t-2xl shadow-xl"
         style={{
-          maxHeight: '70vh',
+          maxHeight: '85dvh',
           transform: `translateY(${dragY}px)`,
           transition: isDragging ? 'none' : 'transform 0.3s ease-out',
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          willChange: 'transform',
         }}
       >
         {/* Drag handle */}
@@ -90,7 +91,7 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
         )}
 
         {/* Content */}
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(70vh - 60px)' }}>
+        <div className="overflow-y-auto" style={{ maxHeight: 'calc(85dvh - 60px)' }}>
           {children}
         </div>
       </div>

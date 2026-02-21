@@ -21,10 +21,20 @@ export function MessageList({
   isStreaming,
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isNearBottom = useRef(true);
 
-  // Auto-scroll to bottom when new messages arrive
+  const handleScroll = () => {
+    const el = containerRef.current;
+    if (!el) return;
+    isNearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+  };
+
+  // Smart auto-scroll: only scroll to bottom if user is near the bottom
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isNearBottom.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, streamingMessage]);
 
   if (messages.length === 0 && !streamingMessage) {
@@ -57,7 +67,7 @@ export function MessageList({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-4">
+    <div ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-4">
       {messages.map((message) => (
         <MessageBubble
           key={message.id}

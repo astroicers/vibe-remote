@@ -219,7 +219,7 @@ export function ChatPage() {
         {/* New conversation */}
         <button
           onClick={handleNewConversation}
-          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-bg-tertiary"
+          className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-bg-tertiary"
           title="New conversation"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-text-secondary">
@@ -238,7 +238,7 @@ export function ChatPage() {
                 clearError();
                 retryConversation(wsId, currentConversationId);
               }}
-              className="px-3 py-1 bg-danger/30 hover:bg-danger/40 rounded-full text-xs font-medium transition-colors"
+              className="px-3 py-2 min-h-[44px] bg-danger/30 hover:bg-danger/40 rounded-full text-xs font-medium transition-colors"
             >
               Retry
             </button>

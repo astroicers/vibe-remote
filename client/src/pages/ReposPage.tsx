@@ -142,7 +142,7 @@ export function ReposPage() {
       {error && (
         <div className="mx-4 mt-4 p-3 bg-danger/20 rounded-xl flex items-center justify-between flex-shrink-0">
           <span className="text-sm text-danger">{error}</span>
-          <button onClick={clearError} className="text-danger hover:text-danger/80">
+          <button onClick={clearError} className="w-10 h-10 flex items-center justify-center text-danger hover:text-danger/80">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
               <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
             </svg>
@@ -196,7 +196,7 @@ export function ReposPage() {
                 {/* Quick Actions Button */}
                 <button
                   onClick={() => setShowQuickActions(true)}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-accent/10 text-accent rounded-xl text-sm font-medium hover:bg-accent/20 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-3 min-h-[44px] bg-accent/10 text-accent rounded-xl text-sm font-medium hover:bg-accent/20 transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
                     <path fillRule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clipRule="evenodd" />

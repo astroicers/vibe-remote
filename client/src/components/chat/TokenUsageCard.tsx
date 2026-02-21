@@ -43,7 +43,7 @@ function TokenUsageCardComponent({ tokenUsage, onDismiss }: TokenUsageCardProps)
         </div>
         <button
           onClick={onDismiss}
-          className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-bg-tertiary text-text-muted"
+          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-tertiary text-text-muted"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
             <path
@@ -55,7 +55,7 @@ function TokenUsageCardComponent({ tokenUsage, onDismiss }: TokenUsageCardProps)
         </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-2 text-center">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-center">
         <div>
           <div className="text-xs text-text-muted">Input</div>
           <div className="text-sm font-medium text-text-primary">

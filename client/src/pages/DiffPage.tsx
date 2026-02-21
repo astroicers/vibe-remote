@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FileList, DiffViewer, ReviewActions, DiffCommentInput, DiffCommentList } from '../components/diff';
 import { AppLayout } from '../components/AppLayout';
@@ -81,6 +81,27 @@ export function DiffPage() {
     if (hasNext && wsId) selectFile(wsId, files[currentIndex + 1]);
   };
 
+  // Swipe-to-navigate between files
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+
+  const handleSwipeStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleSwipeEnd = (e: React.TouchEvent) => {
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+      if (deltaX > 0 && hasPrev) {
+        goToPrevFile();
+      } else if (deltaX < 0 && hasNext) {
+        goToNextFile();
+      }
+    }
+  };
+
   const handleRejectAll = async () => {
     if (!wsId) return;
     await rejectAll(wsId);
@@ -147,7 +168,7 @@ export function DiffPage() {
       {error && (
         <div className="px-4 py-2 bg-danger/20 text-danger text-sm flex items-center justify-between flex-shrink-0">
           <span>{error}</span>
-          <button onClick={clearError} className="w-6 h-6 flex items-center justify-center text-danger hover:text-danger/80">
+          <button onClick={clearError} className="w-8 h-8 flex items-center justify-center text-danger hover:text-danger/80">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
               <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
             </svg>
@@ -183,7 +204,11 @@ export function DiffPage() {
 
       {/* Main content - Diff viewer */}
       {!isLoading && files.length > 0 && (
-        <div className="flex-1 overflow-auto">
+        <div
+          className="flex-1 overflow-auto"
+          onTouchStart={handleSwipeStart}
+          onTouchEnd={handleSwipeEnd}
+        >
           {selectedFile ? (
             <div>
               {/* File header with prev/next navigation */}
@@ -193,7 +218,7 @@ export function DiffPage() {
                   <button
                     onClick={goToPrevFile}
                     disabled={!hasPrev}
-                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-tertiary disabled:opacity-30 disabled:hover:bg-transparent"
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-bg-tertiary disabled:opacity-30 disabled:hover:bg-transparent"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-text-secondary">
                       <path fillRule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clipRule="evenodd" />
@@ -204,7 +229,7 @@ export function DiffPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span
-                        className={`flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold ${
+                        className={`flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-xs font-bold ${
                           selectedFile.status === 'added'
                             ? 'bg-success/20 text-success'
                             : selectedFile.status === 'deleted'
@@ -238,7 +263,7 @@ export function DiffPage() {
                   <button
                     onClick={goToNextFile}
                     disabled={!hasNext}
-                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-tertiary disabled:opacity-30 disabled:hover:bg-transparent"
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-bg-tertiary disabled:opacity-30 disabled:hover:bg-transparent"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-text-secondary">
                       <path fillRule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
@@ -251,13 +276,13 @@ export function DiffPage() {
                       <div className="w-px h-6 bg-border" />
                       <button
                         onClick={() => wsId && rejectFile(wsId, selectedFile.path)}
-                        className="px-2.5 py-1 text-xs bg-danger/20 text-danger rounded hover:bg-danger/30"
+                        className="px-3 py-2 text-xs bg-danger/20 text-danger rounded hover:bg-danger/30"
                       >
                         Reject
                       </button>
                       <button
                         onClick={() => wsId && approveFile(wsId, selectedFile.path)}
-                        className="px-2.5 py-1 text-xs bg-success/20 text-success rounded hover:bg-success/30"
+                        className="px-3 py-2 text-xs bg-success/20 text-success rounded hover:bg-success/30"
                       >
                         Approve
                       </button>

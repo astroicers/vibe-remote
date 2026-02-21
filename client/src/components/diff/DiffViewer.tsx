@@ -30,7 +30,7 @@ export function DiffViewer({ file }: DiffViewerProps) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full">
       {file.hunks.map((hunk, index) => (
         <HunkView key={index} hunk={hunk} />
       ))}
@@ -49,7 +49,7 @@ function HunkView({ hunk }: { hunk: DiffHunk }) {
         return (
           <div
             key={index}
-            className={`flex font-mono text-xs ${
+            className={`flex font-mono text-[12px] ${
               lineType === 'header'
                 ? 'bg-accent/10 text-accent'
                 : lineType === 'add'

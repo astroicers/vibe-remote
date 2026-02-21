@@ -99,7 +99,7 @@ export function TaskCard({ task, onRun, onCancel, onDelete }: TaskCardProps) {
         {canRun && onRun && (
           <button
             onClick={() => onRun(task.id)}
-            className="flex-1 text-xs font-medium py-1.5 px-3 rounded-md bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
+            className="flex-1 text-xs font-medium py-2.5 px-3 min-h-[40px] rounded-md bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
           >
             Run
           </button>
@@ -107,7 +107,7 @@ export function TaskCard({ task, onRun, onCancel, onDelete }: TaskCardProps) {
         {canCancel && onCancel && (
           <button
             onClick={() => onCancel(task.id)}
-            className="flex-1 text-xs font-medium py-1.5 px-3 rounded-md bg-warning/15 text-warning hover:bg-warning/25 transition-colors"
+            className="flex-1 text-xs font-medium py-2.5 px-3 min-h-[40px] rounded-md bg-warning/15 text-warning hover:bg-warning/25 transition-colors"
           >
             Cancel
           </button>
@@ -115,7 +115,7 @@ export function TaskCard({ task, onRun, onCancel, onDelete }: TaskCardProps) {
         {canDelete && onDelete && (
           <button
             onClick={() => onDelete(task.id)}
-            className="text-xs font-medium py-1.5 px-3 rounded-md bg-danger/15 text-danger hover:bg-danger/25 transition-colors"
+            className="text-xs font-medium py-2.5 px-3 min-h-[40px] rounded-md bg-danger/15 text-danger hover:bg-danger/25 transition-colors"
           >
             Delete
           </button>

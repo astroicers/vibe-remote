@@ -60,6 +60,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
       ref={elementRef}
       data-testid={`toast-${toast.type}`}
       className={`${typeStyles[toast.type]} px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg pointer-events-auto max-w-[90vw] animate-slide-up flex items-center gap-2 transition-[transform,opacity] duration-150`}
+      style={{ willChange: 'transform, opacity' }}
       onClick={() => onDismiss(toast.id)}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
