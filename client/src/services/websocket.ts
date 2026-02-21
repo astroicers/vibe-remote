@@ -164,7 +164,8 @@ export function sendChatMessage(
   message: string,
   workspaceId: string,
   conversationId?: string,
-  selectedFiles?: string[]
+  selectedFiles?: string[],
+  model?: string
 ): void {
   ws.send({
     type: 'chat_send',
@@ -172,6 +173,7 @@ export function sendChatMessage(
     message,
     conversationId,
     selectedFiles,
+    model,
   });
 }
 

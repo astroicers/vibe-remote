@@ -1,8 +1,38 @@
 // Settings Page - App configuration and preferences
 
+import { useEffect, useState } from 'react';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { useSettingsStore, VOICE_LANGUAGES } from '../stores/settings';
+import { useAuthStore } from '../stores/auth';
+import { auth } from '../services/api';
+import { ws } from '../services/websocket';
 import { AppLayout } from '../components/AppLayout';
+
+function formatRelativeTime(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+
+  if (diffMs < 0) return 'just now';
+
+  const seconds = Math.floor(diffMs / 1000);
+  if (seconds < 60) return 'just now';
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+
+  const years = Math.floor(months / 12);
+  return `${years}y ago`;
+}
 
 interface SettingItemProps {
   icon: React.ReactNode;
@@ -74,6 +104,58 @@ export function SettingsPage() {
     setProjectsPath,
   } = useSettingsStore();
 
+  // Auth store
+  const authStore = useAuthStore();
+
+  // Connection status polling
+  const [wsConnected, setWsConnected] = useState(ws.connected);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setWsConnected(ws.connected);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Device management
+  const [devices, setDevices] = useState<Array<{ id: string; name: string; last_seen_at: string; created_at: string }>>([]);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const [revokeConfirmId, setRevokeConfirmId] = useState<string | null>(null);
+
+  const loadDevices = async () => {
+    setDevicesLoading(true);
+    try {
+      const list = await auth.getDevices();
+      setDevices(list);
+    } catch {
+      // Silently fail — devices section will just be empty
+    } finally {
+      setDevicesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDevices();
+  }, []);
+
+  const handleRevokeDevice = async (id: string) => {
+    try {
+      await auth.revokeDevice(id);
+      setRevokeConfirmId(null);
+      await loadDevices();
+    } catch {
+      // Silently fail
+    }
+  };
+
+  // Logout
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const handleLogout = () => {
+    useAuthStore.getState().logout();
+    window.location.reload();
+  };
+
   // Push notifications
   const {
     isSupported: pushSupported,
@@ -102,6 +184,79 @@ export function SettingsPage() {
 
       {/* Content */}
       <main className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+        {/* Connection Section */}
+        <section>
+          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Connection</h2>
+          <div className="space-y-2">
+            <div className="p-4 bg-bg-secondary rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-text-secondary">Device Name</span>
+                <span className="text-sm font-medium text-text-primary">{authStore.deviceName || 'Unknown'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-text-secondary">Device ID</span>
+                <span className="text-sm font-mono text-text-muted">{authStore.deviceId ? authStore.deviceId.substring(0, 8) : '---'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-text-secondary">WebSocket</span>
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-success' : 'bg-danger'}`} />
+                  <span className={wsConnected ? 'text-success' : 'text-danger'}>
+                    {wsConnected ? 'Connected' : 'Disconnected'}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Devices Section */}
+        <section>
+          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Devices</h2>
+          <div className="space-y-2">
+            {devicesLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-accent" />
+              </div>
+            ) : devices.length === 0 ? (
+              <div className="p-4 bg-bg-secondary rounded-xl">
+                <p className="text-sm text-text-muted text-center">No devices found</p>
+              </div>
+            ) : (
+              devices.map((device) => {
+                const isCurrentDevice = device.id === authStore.deviceId;
+                return (
+                  <div key={device.id} className="flex items-center gap-3 p-4 bg-bg-secondary rounded-xl">
+                    <div className="w-10 h-10 rounded-xl bg-bg-tertiary flex items-center justify-center text-text-secondary">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                        <path d="M10.5 18.75a.75.75 0 0 0 0 1.5h3a.75.75 0 0 0 0-1.5h-3Z" />
+                        <path fillRule="evenodd" d="M8.625.75A3.375 3.375 0 0 0 5.25 4.125v15.75a3.375 3.375 0 0 0 3.375 3.375h6.75a3.375 3.375 0 0 0 3.375-3.375V4.125A3.375 3.375 0 0 0 15.375.75h-6.75ZM7.5 4.125C7.5 3.504 8.004 3 8.625 3h6.75C16.496 3 17 3.504 17 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-6.75A1.125 1.125 0 0 1 7.5 19.875V4.125Z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-text-primary truncate">{device.name}</span>
+                        {isCurrentDevice && (
+                          <span className="text-xs text-accent bg-accent/10 px-1.5 py-0.5 rounded-md flex-shrink-0">(this device)</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-text-muted">{formatRelativeTime(device.last_seen_at)}</p>
+                    </div>
+                    {!isCurrentDevice && (
+                      <button
+                        onClick={() => setRevokeConfirmId(device.id)}
+                        className="px-3 py-1.5 text-xs font-medium text-danger bg-danger/10 rounded-lg hover:bg-danger/20 transition-colors flex-shrink-0"
+                      >
+                        Revoke
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+
         {/* Workspace Section */}
         <section>
           <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Workspace</h2>
@@ -265,9 +420,79 @@ export function SettingsPage() {
           </div>
         </section>
 
+        {/* Account Section */}
+        <section>
+          <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Account</h2>
+          <div className="space-y-2">
+            <button
+              onClick={() => setShowLogoutConfirm(true)}
+              className="w-full flex items-center gap-4 p-4 bg-bg-secondary rounded-xl hover:opacity-80 transition-opacity"
+            >
+              <div className="w-10 h-10 rounded-xl bg-danger/10 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-danger">
+                  <path fillRule="evenodd" d="M7.5 3.75A1.5 1.5 0 0 0 6 5.25v13.5a1.5 1.5 0 0 0 1.5 1.5h6a1.5 1.5 0 0 0 1.5-1.5V15a.75.75 0 0 1 1.5 0v3.75a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3V5.25a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3V9a.75.75 0 0 1-1.5 0V5.25a1.5 1.5 0 0 0-1.5-1.5h-6Zm10.72 4.72a.75.75 0 0 1 1.06 0l3 3a.75.75 0 0 1 0 1.06l-3 3a.75.75 0 1 1-1.06-1.06l1.72-1.72H9a.75.75 0 0 1 0-1.5h10.94l-1.72-1.72a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <span className="font-medium text-danger">Logout</span>
+            </button>
+          </div>
+        </section>
+
         {/* Spacer for bottom nav */}
         <div className="h-4" />
       </main>
+
+      {/* Logout Confirm Dialog */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowLogoutConfirm(false)} />
+          <div className="relative bg-bg-elevated rounded-2xl p-6 mx-4 w-full max-w-sm">
+            <h3 className="text-lg font-semibold text-text-primary mb-2">Logout</h3>
+            <p className="text-sm text-text-secondary mb-6">Are you sure you want to logout? You will need to re-authenticate to use Vibe Remote.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2.5 bg-bg-tertiary text-text-secondary rounded-xl text-sm font-medium hover:bg-bg-surface transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex-1 py-2.5 bg-danger text-white rounded-xl text-sm font-medium hover:bg-danger/90 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revoke Device Confirm Dialog */}
+      {revokeConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setRevokeConfirmId(null)} />
+          <div className="relative bg-bg-elevated rounded-2xl p-6 mx-4 w-full max-w-sm">
+            <h3 className="text-lg font-semibold text-text-primary mb-2">Revoke Device</h3>
+            <p className="text-sm text-text-secondary mb-6">
+              Are you sure you want to revoke access for &quot;{devices.find((d) => d.id === revokeConfirmId)?.name || 'this device'}&quot;? It will need to re-authenticate.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setRevokeConfirmId(null)}
+                className="flex-1 py-2.5 bg-bg-tertiary text-text-secondary rounded-xl text-sm font-medium hover:bg-bg-surface transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRevokeDevice(revokeConfirmId)}
+                className="flex-1 py-2.5 bg-danger text-white rounded-xl text-sm font-medium hover:bg-danger/90 transition-colors"
+              >
+                Revoke
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

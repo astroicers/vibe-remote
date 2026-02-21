@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { chat, type Conversation, type Message } from '../services/api';
 import { ws, sendChatMessage } from '../services/websocket';
 import { useWorkspaceStore } from './workspace';
+import { useSettingsStore } from './settings';
 import { useToastStore } from './toast';
 
 export interface TokenUsage {
@@ -338,7 +339,11 @@ export const useChatStore = create<ChatState>((set, get) => {
         }))
       );
       set({ error: null });
-      sendChatMessage(content, workspaceId, wsChat.currentConversationId || undefined, selectedFiles);
+      const modelSetting = useSettingsStore.getState().model;
+      const modelId = modelSetting === 'opus'
+        ? 'claude-opus-4-20250514'
+        : 'claude-sonnet-4-20250514';
+      sendChatMessage(content, workspaceId, wsChat.currentConversationId || undefined, selectedFiles, modelId);
     },
 
     retryConversation: (workspaceId: string, conversationId: string) => {

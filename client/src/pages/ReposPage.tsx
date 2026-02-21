@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useWorkspaceStore } from '../stores/workspace';
+import { useSettingsStore } from '../stores/settings';
 import { AppLayout } from '../components/AppLayout';
 import { QuickActions } from '../components/actions/QuickActions';
 import { workspaces as workspacesApi, type ScannedRepo } from '../services/api';
@@ -32,7 +33,7 @@ export function ReposPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
 
-  const projectsPath = localStorage.getItem('settings_projects_path') || '';
+  const { projectsPath } = useSettingsStore();
 
   const scanForRepos = useCallback(async () => {
     if (!projectsPath) return;

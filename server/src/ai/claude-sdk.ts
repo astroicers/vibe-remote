@@ -55,6 +55,8 @@ export interface ClaudeSdkOptions {
   systemPrompt?: string;
   /** Session ID to resume an existing conversation */
   resumeSessionId?: string;
+  /** Claude model ID override (e.g. 'claude-sonnet-4-20250514', 'claude-opus-4-20250514') */
+  model?: string;
 }
 
 export interface ChatResponse {
@@ -78,7 +80,7 @@ export class ClaudeSdkRunner extends EventEmitter {
     let sessionId: string | undefined;
 
     const sdkOptions: Options = {
-      model: config.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
+      model: options.model || config.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
       cwd: options.workspacePath,
       maxTurns: options.maxTurns || 20,
       abortController: this.abortController,

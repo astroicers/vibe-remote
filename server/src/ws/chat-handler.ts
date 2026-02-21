@@ -28,6 +28,7 @@ const chatMessageSchema = z.object({
   conversationId: z.string().optional(),
   message: z.string().min(1),
   selectedFiles: z.array(z.string()).optional(),
+  model: z.string().optional(),
 });
 
 const authMessageSchema = z.object({
@@ -536,6 +537,7 @@ async function handleChatMessage(
       permissionMode: 'bypassPermissions',
       maxTurns: 20,
       resumeSessionId: conversation.sdk_session_id || undefined,
+      model: data.model,
     });
 
     // Save assistant message

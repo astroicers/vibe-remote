@@ -68,6 +68,12 @@ export const auth = {
       '/auth/pairing/start',
       { method: 'POST' }
     ),
+
+  getDevices: () =>
+    request<Array<{ id: string; name: string; last_seen_at: string; created_at: string }>>('/auth/devices'),
+
+  revokeDevice: (id: string) =>
+    request<{ success: boolean }>(`/auth/devices/${id}`, { method: 'DELETE' }),
 };
 
 // Workspace API
