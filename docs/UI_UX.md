@@ -86,9 +86,12 @@
 │  └────────────────────────┘  │
 │                              │
 ├──────────────────────────────┤
-│  ┌──────────────────────┐ QA │  ← 輸入區域
-│  │ Type a message...     │   │     QA = Quick Actions（git 操作面板）
-│  └──────────────────────┘ >>  │     >> = 送出
+│ [+] [  Type a message... ] [>]│  ← Telegram Plus 輸入區域
+│                              │     [+] = 展開工具列（Quick Actions / Attach / Templates）
+│  展開時：                     │     [>] = Send（有文字）/ Voice（無文字）/ Stop（語音中）
+│  ┌──────────────────────────┐│
+│  │⚡Quick  📎Attach  📄Tmpl ││  ← 可展開工具列（點 + 切換）
+│  └──────────────────────────┘│
 │                              │
 ├──────────────────────────────┤
 │ Chat | Diff | Tasks | Repos | Settings │  ← 底部導航（5 tabs）
@@ -125,6 +128,14 @@
   - AI 回覆完成後顯示在訊息區域底部
   - 4 欄 grid 顯示：Input tokens、Output tokens、Cache tokens、Cost (USD)
   - 點擊 X 關閉
+
+- **ChatInput（Telegram Plus 模式）**:
+  - 佈局：`[+] [textarea] [Send/Voice]`，三個元素水平排列
+  - `[+]` 按鈕：點擊展開工具列（Quick Actions / Attach / Templates），再點收合（旋轉 45deg 變 `x`）
+  - textarea：`flex-1` 佔滿剩餘空間，max-height 40vh（~320px），自動撐高
+  - 右側 morph 按鈕：有文字→Send 箭頭 / 無文字+voice→麥克風 / 語音中→紅色停止
+  - 有附加檔案時 `+` 按鈕右上角顯示藍色小點
+  - 送出訊息後自動關閉工具列、清空 textarea
 
 - **Quick Actions**:
   - 點擊 Quick Actions 按鈕 → 從底部滑出 Quick Actions 面板
@@ -339,7 +350,7 @@ App [x]
     │   │   └── MessageBubble [x]      # 單一訊息（含 markdown + code block）
     │   ├── ToolApprovalCard [x]       # AI tool use 審批
     │   ├── TokenUsageCard [x]         # Token 使用量顯示
-    │   ├── ChatInput [x]              # 文字輸入 + 送出
+    │   ├── ChatInput [x]              # Telegram Plus 輸入（[+] 工具列 + textarea + Send/Voice morph）
     │   └── QuickActions [x]           # Git 操作 BottomSheet（Stage/Commit/Push/Pull）
     │
     ├── DiffPage [x]
@@ -368,7 +379,7 @@ App [x]
     [x] PullToRefresh                  # 下拉刷新手勢
     [x] EmptyState                     # 通用空狀態元件
     [x] BottomSheet                    # 滑出式面板
-    [x] AttachButton (chat/AttachButton.tsx)          # 附加檔案按鈕
+    [x] AttachButton (chat/AttachButton.tsx)          # 附加檔案按鈕（已 inline 到 ChatInput toolbar）
     [x] ContextFileSheet (chat/ContextFileSheet.tsx)  # 檔案選擇 BottomSheet
     [x] FileTree (chat/FileTree.tsx)                  # 檔案樹元件
     [x] PromptTemplateSheet (chat/PromptTemplateSheet.tsx)  # Prompt template 選擇
@@ -626,14 +637,16 @@ Component Spacing Guidelines:
   outline: none;
 }
 
-/* Large Text Area (Chat input) */
+/* Large Text Area (Chat input — Telegram Plus pattern) */
 .textarea-chat {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);     /* 16px */
-  padding: 16px;
-  min-height: 56px;
-  max-height: 200px;
+  border-radius: 16px;                 /* rounded-2xl */
+  padding: 10px 16px;
+  min-height: 44px;
+  max-height: 40vh;                    /* ~320px，提供充足書寫空間 */
+  font-size: 15px;
+  line-height: 1.4;
   resize: none;
 }
 ```

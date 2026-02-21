@@ -383,6 +383,15 @@ console.error('[ERROR] Database error', error.message);
 console.warn('[WARN] No Claude authentication configured');
 ```
 
+### Client-side Error Capture
+
+`client/index.html` 內建錯誤捕捉機制，用於手機端除錯（iOS Safari / Android Chrome 無法方便開 DevTools）：
+
+- `window.onerror` + `unhandledrejection` 捕捉所有 JS 錯誤，存入 `_errors[]`
+- 5 秒後若 React 未渲染（`#root` 無子元素），顯示錯誤頁面
+- 自動清除過期的 Service Worker，避免快取問題
+- 適用場景：部署後白畫面除錯、React 啟動崩潰（如 Error #185 無限迴圈）
+
 ## Vite Proxy 設定
 
 開發時 client (5173) 代理到 server (3000)：
