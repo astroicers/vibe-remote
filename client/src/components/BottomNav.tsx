@@ -69,12 +69,17 @@ const SettingsIcon = (
 );
 
 export function BottomNav() {
-  const { selectedWorkspaceId } = useWorkspaceStore();
-  const diffState = useDiffStore((s) => selectedWorkspaceId ? (s.diffByWorkspace[selectedWorkspaceId] || { reviews: [] }) : { reviews: [] });
-  const taskState = useTaskStore((s) => selectedWorkspaceId ? (s.tasksByWorkspace[selectedWorkspaceId] || { tasks: [] }) : { tasks: [] });
-
-  const diffBadge = diffState.reviews.filter((r: { status: string }) => r.status === 'pending').length;
-  const tasksBadge = taskState.tasks.filter((t: { status: string }) => t.status === 'queued' || t.status === 'running').length;
+  const selectedWorkspaceId = useWorkspaceStore((s) => s.selectedWorkspaceId);
+  const diffBadge = useDiffStore((s) => {
+    if (!selectedWorkspaceId) return 0;
+    const ws = s.diffByWorkspace[selectedWorkspaceId];
+    return ws ? ws.reviews.filter((r) => r.status === 'pending').length : 0;
+  });
+  const tasksBadge = useTaskStore((s) => {
+    if (!selectedWorkspaceId) return 0;
+    const ws = s.tasksByWorkspace[selectedWorkspaceId];
+    return ws ? ws.tasks.filter((t) => t.status === 'queued' || t.status === 'running').length : 0;
+  });
 
   return (
     <nav className="bottom-nav">

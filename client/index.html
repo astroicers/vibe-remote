@@ -16,6 +16,34 @@
   </head>
   <body class="bg-bg-primary text-text-primary">
     <div id="root"></div>
+    <script>
+      // Capture JS errors for display
+      var _errors = [];
+      window.onerror = function(msg, src, line, col, err) {
+        _errors.push(msg + ' (' + src + ':' + line + ')');
+      };
+      window.addEventListener('unhandledrejection', function(e) {
+        _errors.push('Promise: ' + (e.reason && e.reason.message || e.reason || 'unknown'));
+      });
+      // Unregister stale service workers
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          regs.forEach(function(r) { r.unregister(); });
+        });
+      }
+      // Fallback: show captured errors if React fails to render
+      setTimeout(function() {
+        var root = document.getElementById('root');
+        if (root && root.children.length === 0) {
+          var errHtml = _errors.length > 0
+            ? '<pre style="background:#1a1a1a;padding:1rem;border-radius:8px;overflow-x:auto;font-size:12px;white-space:pre-wrap;word-break:break-all">' + _errors.join('\n\n') + '</pre>'
+            : '<p>No errors captured. Check DevTools console.</p>';
+          root.innerHTML = '<div style="color:#e4e4e7;padding:2rem;font-family:sans-serif">' +
+            '<h2 style="color:#ef4444">Loading failed</h2>' + errHtml +
+            '<p style="margin-top:1rem"><a href="/?v=' + Date.now() + '" style="color:#3b82f6">Reload</a></p></div>';
+        }
+      }, 5000);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
