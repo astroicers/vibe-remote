@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: server/Dockerfile
     ports:
-      - "${PORT:-8080}:8080"
+      - "8080:8080"
     volumes:
       # Mount workspace for Claude to access
       - ${WORKSPACE_HOST_PATH:-/home/ubuntu}:/workspace:rw
