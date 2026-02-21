@@ -19,6 +19,12 @@ export async function createDiffReview(
   const diffOutput = await getGitDiff(workspacePath, false);
   const summary = parseDiff(diffOutput);
 
+  // Filter out internal tool config files that should not appear in reviews
+  const IGNORED_PREFIXES = ['.claude/', '.vscode/', '.idea/'];
+  summary.files = summary.files.filter(
+    (f) => !IGNORED_PREFIXES.some((prefix) => f.path.startsWith(prefix))
+  );
+
   if (summary.files.length === 0) {
     throw new Error('No changes to review');
   }
