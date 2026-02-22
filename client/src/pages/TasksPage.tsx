@@ -7,6 +7,7 @@ import { TaskCreateSheet } from '../components/tasks/TaskCreateSheet';
 import { useTaskStore } from '../stores/tasks';
 import { useWorkspaceStore } from '../stores/workspace';
 import type { Task, CreateTaskData } from '../services/api';
+import { useTaskWebSocket } from '../hooks/useTaskWebSocket';
 
 // Icons
 function ClockIcon() {
@@ -50,6 +51,7 @@ function PlusIcon() {
 }
 
 export function TasksPage() {
+  useTaskWebSocket();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const selectedWorkspaceId = useWorkspaceStore((s) => s.selectedWorkspaceId);
   const { getTaskState, loadTasks, createTask, runTask, cancelTask, deleteTask, isLoading, error, clearError } = useTaskStore();
