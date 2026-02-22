@@ -1,8 +1,9 @@
 // Task Runner — executes tasks using ClaudeSdkRunner
 // Supports auto-branch creation: stash → checkout -b → run AI → leave on branch
+// Streams real-time progress events (text, tool_use, tool_result, complete) via callback
 
 import type { Task } from './manager.js';
-import { ClaudeSdkRunner } from '../ai/claude-sdk.js';
+import { ClaudeSdkRunner, type StreamEvent } from '../ai/claude-sdk.js';
 import { resolveModelId } from '../ai/models.js';
 import { getWorkspace } from '../workspace/manager.js';
 import {
@@ -13,7 +14,17 @@ import {
   popStash,
 } from '../workspace/git-ops.js';
 
-export async function runTask(task: Task): Promise<{ result?: string; error?: string }> {
+export type TaskEventCallback = (event: {
+  type: string;
+  taskId: string;
+  workspaceId: string;
+  [key: string]: unknown;
+}) => void;
+
+export async function runTask(
+  task: Task,
+  onEvent?: TaskEventCallback
+): Promise<{ result?: string; error?: string }> {
   // 1. Look up workspace
   const workspace = getWorkspace(task.workspace_id);
   if (!workspace) {
@@ -66,6 +77,67 @@ export async function runTask(task: Task): Promise<{ result?: string; error?: st
 
   // 4. Create runner and execute
   const runner = new ClaudeSdkRunner();
+
+  // 5. Set up event streaming with 100ms text throttling
+  let textBuffer = '';
+  let flushTimer: ReturnType<typeof setTimeout> | null = null;
+  const THROTTLE_MS = 100;
+
+  function flushTextBuffer(): void {
+    if (textBuffer && onEvent) {
+      onEvent({
+        type: 'task_progress',
+        taskId: task.id,
+        workspaceId: task.workspace_id,
+        text: textBuffer,
+      });
+      textBuffer = '';
+    }
+    flushTimer = null;
+  }
+
+  if (onEvent) {
+    runner.on('event', (event: StreamEvent) => {
+      switch (event.type) {
+        case 'text':
+          textBuffer += event.content || '';
+          if (!flushTimer) {
+            flushTimer = setTimeout(flushTextBuffer, THROTTLE_MS);
+          }
+          break;
+
+        case 'tool_use':
+          flushTextBuffer();
+          onEvent({
+            type: 'task_tool_use',
+            taskId: task.id,
+            workspaceId: task.workspace_id,
+            tool: event.toolName || 'unknown',
+            input: event.toolInput,
+          });
+          break;
+
+        case 'tool_result':
+          onEvent({
+            type: 'task_tool_result',
+            taskId: task.id,
+            workspaceId: task.workspace_id,
+            tool: event.toolName || 'unknown',
+            result: event.toolResult,
+          });
+          break;
+
+        case 'error':
+          flushTextBuffer();
+          break;
+
+        case 'done':
+          flushTextBuffer();
+          break;
+      }
+    });
+  }
+
   try {
     const response = await runner.run(prompt, {
       workspacePath: workspace.path,
@@ -75,8 +147,39 @@ export async function runTask(task: Task): Promise<{ result?: string; error?: st
       model: resolveModelId(),  // uses server default
     });
 
+    // Flush any remaining buffered text
+    flushTextBuffer();
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+
+    // Emit task_complete event
+    onEvent?.({
+      type: 'task_complete',
+      taskId: task.id,
+      workspaceId: task.workspace_id,
+      status: 'completed',
+      result: response.fullText || 'Task completed successfully',
+      modifiedFiles: response.modifiedFiles,
+      tokenUsage: response.tokenUsage,
+    });
+
     return { result: response.fullText || 'Task completed successfully' };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Unknown error during task execution' };
+    // Flush any remaining buffered text
+    flushTextBuffer();
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error during task execution';
+
+    // Emit task_complete with failed status
+    onEvent?.({
+      type: 'task_complete',
+      taskId: task.id,
+      workspaceId: task.workspace_id,
+      status: 'failed',
+      error: errorMessage,
+      modifiedFiles: [],
+    });
+
+    return { error: errorMessage };
   }
 }

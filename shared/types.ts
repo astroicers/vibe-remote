@@ -170,6 +170,10 @@ export type WSEventType =
   | 'diff:updated'
   | 'task:status'
   | 'workspace:changed'
+  | 'task:progress'
+  | 'task:tool_use'
+  | 'task:tool_result'
+  | 'task:complete'
   | 'notification';
 
 export interface WSEvent<T = unknown> {

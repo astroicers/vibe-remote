@@ -93,6 +93,25 @@ export function broadcastTaskStatus(task: Record<string, unknown>): void {
   }
 }
 
+// Broadcast task execution events (progress, tool use, completion) to all clients
+export function broadcastTaskEvent(event: {
+  type: string;
+  taskId: string;
+  workspaceId: string;
+  [key: string]: unknown;
+}): void {
+  const payload = JSON.stringify({
+    ...event,
+    timestamp: new Date().toISOString(),
+  });
+
+  for (const client of connectedClients) {
+    if (client.readyState === client.OPEN && client.isAuthenticated) {
+      client.send(payload);
+    }
+  }
+}
+
 // Rate limiting
 const rateLimitMap = new Map<string, number[]>();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute

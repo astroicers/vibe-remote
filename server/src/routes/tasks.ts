@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { authMiddleware } from '../auth/middleware.js';
 import { TaskManager, TaskQueue, ValidationError, type Task } from '../tasks/index.js';
 import { runTask } from '../tasks/runner.js';
-import { broadcastTaskStatus } from '../ws/index.js';
+import { broadcastTaskStatus, broadcastTaskEvent } from '../ws/index.js';
 
 const router = Router();
 
@@ -22,6 +22,11 @@ taskQueue.setRunner(runTask);
 // Broadcast task status changes via WebSocket
 taskQueue.onTaskStatusChange((task: Task) => {
   broadcastTaskStatus(task as unknown as Record<string, unknown>);
+});
+
+// Broadcast task execution events (progress, tool use, completion) via WebSocket
+taskQueue.onTaskEventCallback((event) => {
+  broadcastTaskEvent(event);
 });
 
 // List tasks (requires workspaceId query param)

@@ -3,7 +3,17 @@
 import { TaskManager, type Task } from './manager.js';
 import { getDb } from '../db/index.js';
 
-type TaskRunnerFn = (task: Task) => Promise<{ result?: string; error?: string }>;
+type TaskEventPayload = {
+  type: string;
+  taskId: string;
+  workspaceId: string;
+  [key: string]: unknown;
+};
+
+type TaskRunnerFn = (
+  task: Task,
+  onEvent?: (event: TaskEventPayload) => void
+) => Promise<{ result?: string; error?: string }>;
 
 export class TaskQueue {
   private manager: TaskManager;
@@ -11,6 +21,7 @@ export class TaskQueue {
   private isProcessing = false;
   private currentTaskId: string | null = null;
   private onStatusChange: ((task: Task) => void) | null = null;
+  private onTaskEvent: ((event: TaskEventPayload) => void) | null = null;
 
   constructor(manager: TaskManager) {
     this.manager = manager;
@@ -22,6 +33,10 @@ export class TaskQueue {
 
   onTaskStatusChange(callback: (task: Task) => void): void {
     this.onStatusChange = callback;
+  }
+
+  onTaskEventCallback(callback: (event: TaskEventPayload) => void): void {
+    this.onTaskEvent = callback;
   }
 
   async enqueue(_taskId: string): Promise<void> {
@@ -84,7 +99,7 @@ export class TaskQueue {
     if (running) this.onStatusChange?.(running);
 
     try {
-      const result = await this.runner(next);
+      const result = await this.runner(next, this.onTaskEvent ?? undefined);
 
       // Check if cancelled during execution
       const current = this.manager.getTask(next.id);
