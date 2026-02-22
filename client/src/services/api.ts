@@ -382,6 +382,7 @@ export const templates = {
 // Tasks API
 export type TaskStatus = 'pending' | 'queued' | 'running' | 'awaiting_review' | 'approved' | 'committed' | 'completed' | 'failed' | 'cancelled';
 export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent';
+export type DependencyStatus = 'ready' | 'waiting' | 'blocked';
 
 export interface Task {
   id: string;
@@ -393,6 +394,7 @@ export interface Task {
   progress: number | null;
   branch: string | null;
   depends_on: string | null;
+  dependency_status: DependencyStatus;
   context_files: string | null;
   result: string | null;
   error: string | null;
@@ -402,6 +404,17 @@ export interface Task {
   updated_at: string;
 }
 
+export interface CreateTaskData {
+  workspaceId: string;
+  title: string;
+  description: string;
+  priority?: TaskPriority;
+  contextFiles?: string[];
+  branch?: string;
+  autoBranch?: boolean;
+  dependsOn?: string[];
+}
+
 export const tasks = {
   list: (workspaceId: string) =>
     request<Task[]>(`/tasks?workspaceId=${workspaceId}`),
@@ -409,7 +422,7 @@ export const tasks = {
   get: (id: string) =>
     request<Task>(`/tasks/${id}`),
 
-  create: (data: { workspaceId: string; title: string; description: string; priority?: TaskPriority; contextFiles?: string[] }) =>
+  create: (data: CreateTaskData) =>
     request<Task>('/tasks', { method: 'POST', json: data }),
 
   update: (id: string, data: Partial<{ title: string; description: string; priority: TaskPriority; status: TaskStatus }>) =>
@@ -423,6 +436,9 @@ export const tasks = {
 
   cancel: (id: string) =>
     request<Task>(`/tasks/${id}/cancel`, { method: 'POST' }),
+
+  getDependents: (id: string) =>
+    request<Task[]>(`/tasks/${id}/dependents`),
 };
 
 export { ApiError };

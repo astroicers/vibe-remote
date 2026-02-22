@@ -125,14 +125,18 @@ export interface ReviewComment {
 // Tasks (Phase 2)
 // --------------------------------------------
 export type TaskStatus =
+  | 'pending'
   | 'queued'
   | 'running'
   | 'awaiting_review'
   | 'approved'
   | 'committed'
-  | 'failed';
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
 
 export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent';
+export type DependencyStatus = 'ready' | 'waiting' | 'blocked';
 
 export interface Task {
   id: string;
@@ -144,6 +148,7 @@ export interface Task {
   progress?: number;
   branch?: string;
   dependsOn?: string[];
+  dependencyStatus?: DependencyStatus;
   contextFiles?: string[];
   createdAt: string;
   startedAt?: string;

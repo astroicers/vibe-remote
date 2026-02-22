@@ -15,6 +15,7 @@ function createMockTask(overrides: Partial<Task> = {}): Task {
     progress: null,
     branch: null,
     depends_on: null,
+    dependency_status: 'ready',
     context_files: null,
     result: null,
     error: null,

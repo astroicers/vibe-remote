@@ -56,9 +56,9 @@ export class TaskQueue {
   private async processNext(): Promise<void> {
     if (this.isProcessing || !this.runner) return;
 
-    // Find next pending task (highest priority first)
+    // Find next pending task whose dependencies are all met
     const db = getDb();
-    const next = db.prepare(
+    const pendingTasks = db.prepare(
       `SELECT * FROM tasks WHERE status = 'pending'
        ORDER BY
          CASE priority
@@ -67,9 +67,12 @@ export class TaskQueue {
            WHEN 'normal' THEN 2
            WHEN 'low' THEN 3
          END ASC,
-         created_at ASC
-       LIMIT 1`
-    ).get() as Task | undefined;
+         created_at ASC`
+    ).all() as Task[];
+
+    const next = pendingTasks.find(task =>
+      this.manager.getDependencyStatus(task) === 'ready'
+    );
 
     if (!next) return;
 
@@ -108,6 +111,7 @@ export class TaskQueue {
     } finally {
       this.isProcessing = false;
       this.currentTaskId = null;
+      // Process next — also picks up downstream tasks whose dependencies just completed
       this.processNext();
     }
   }

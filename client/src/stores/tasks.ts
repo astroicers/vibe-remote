@@ -1,7 +1,7 @@
 // Tasks Store — Per-workspace partitioned task state
 
 import { create } from 'zustand';
-import { tasks, type Task, type TaskPriority } from '../services/api';
+import { tasks, type Task, type TaskPriority, type CreateTaskData } from '../services/api';
 import { useToastStore } from './toast';
 
 interface WorkspaceTaskState {
@@ -21,7 +21,7 @@ interface TaskState {
 
   getTaskState: (workspaceId: string) => WorkspaceTaskState;
   loadTasks: (workspaceId: string) => Promise<void>;
-  createTask: (workspaceId: string, title: string, description: string, priority?: TaskPriority, contextFiles?: string[]) => Promise<Task>;
+  createTask: (data: CreateTaskData) => Promise<Task>;
   updateTask: (workspaceId: string, taskId: string, updates: Partial<{ title: string; description: string; priority: TaskPriority }>) => Promise<void>;
   deleteTask: (workspaceId: string, taskId: string) => Promise<void>;
   runTask: (workspaceId: string, taskId: string) => Promise<void>;
@@ -68,10 +68,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   },
 
-  createTask: async (workspaceId: string, title: string, description: string, priority?: TaskPriority, contextFiles?: string[]) => {
+  createTask: async (data: CreateTaskData) => {
     set({ isLoading: true, error: null });
     try {
-      const task = await tasks.create({ workspaceId, title, description, priority, contextFiles });
+      const task = await tasks.create(data);
+      const workspaceId = data.workspaceId;
       set((state) => ({
         ...updateWorkspaceTasks(state, workspaceId, (ws) => ({
           tasks: [task, ...ws.tasks],
