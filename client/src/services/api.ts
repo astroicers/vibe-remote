@@ -459,3 +459,14 @@ export interface ModelsResponse {
 export const models = {
   list: () => request<ModelsResponse>('/models'),
 };
+
+// Settings API
+export const settings = {
+  get: () => request<{ settings: Record<string, string> }>('/settings'),
+  update: (settingsData: Record<string, string>) =>
+    request<{ settings: Record<string, string> }>('/settings', { method: 'PUT', json: { settings: settingsData } }),
+  updateOne: (key: string, value: string) =>
+    request<{ key: string; value: string; updated_at: string }>(`/settings/${encodeURIComponent(key)}`, { method: 'PATCH', json: { value } }),
+  remove: (key: string) =>
+    request<{ success: boolean }>(`/settings/${encodeURIComponent(key)}`, { method: 'DELETE' }),
+};
