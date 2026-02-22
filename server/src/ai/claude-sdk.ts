@@ -9,6 +9,7 @@
 import { query, type Options, type SDKMessage, type SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import { EventEmitter } from 'events';
 import { config } from '../config.js';
+import { resolveModelId } from './models.js';
 
 // Check authentication on module load
 function checkAuthConfiguration(): void {
@@ -55,7 +56,7 @@ export interface ClaudeSdkOptions {
   systemPrompt?: string;
   /** Session ID to resume an existing conversation */
   resumeSessionId?: string;
-  /** Claude model ID override (e.g. 'claude-sonnet-4-20250514', 'claude-opus-4-20250514') */
+  /** Claude model key (e.g. 'sonnet', 'opus') or full model ID */
   model?: string;
 }
 
@@ -80,7 +81,7 @@ export class ClaudeSdkRunner extends EventEmitter {
     let sessionId: string | undefined;
 
     const sdkOptions: Options = {
-      model: options.model || config.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
+      model: resolveModelId(options.model),
       cwd: options.workspacePath,
       maxTurns: options.maxTurns || 20,
       abortController: this.abortController,
@@ -252,7 +253,7 @@ export class ClaudeSdkRunner extends EventEmitter {
 // Simple prompt execution (non-streaming) for utility functions
 async function runSimplePrompt(prompt: string, workspacePath: string): Promise<string> {
   const sdkOptions: Options = {
-    model: config.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
+    model: resolveModelId(),
     cwd: workspacePath,
     maxTurns: 1,
     tools: [], // No tools for simple prompts

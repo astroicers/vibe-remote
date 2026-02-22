@@ -442,3 +442,20 @@ export const tasks = {
 };
 
 export { ApiError };
+
+// Models API
+export interface ModelInfo {
+  key: string;
+  name: string;
+  description: string;
+  modelId: string;
+}
+
+export interface ModelsResponse {
+  models: ModelInfo[];
+  default: string;
+}
+
+export const models = {
+  list: () => request<ModelsResponse>('/models'),
+};

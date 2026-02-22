@@ -339,11 +339,9 @@ export const useChatStore = create<ChatState>((set, get) => {
         }))
       );
       set({ error: null });
+      // Send model key directly — server resolves to full model ID
       const modelSetting = useSettingsStore.getState().model;
-      const modelId = modelSetting === 'opus'
-        ? 'claude-opus-4-20250514'
-        : 'claude-sonnet-4-20250514';
-      sendChatMessage(content, workspaceId, wsChat.currentConversationId || undefined, selectedFiles, modelId);
+      sendChatMessage(content, workspaceId, wsChat.currentConversationId || undefined, selectedFiles, modelSetting);
     },
 
     retryConversation: (workspaceId: string, conversationId: string) => {

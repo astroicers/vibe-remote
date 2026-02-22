@@ -3,6 +3,7 @@
 
 import type { Task } from './manager.js';
 import { ClaudeSdkRunner } from '../ai/claude-sdk.js';
+import { resolveModelId } from '../ai/models.js';
 import { getWorkspace } from '../workspace/manager.js';
 import {
   getCurrentBranch,
@@ -71,6 +72,7 @@ export async function runTask(task: Task): Promise<{ result?: string; error?: st
       systemPrompt: workspace.systemPrompt || undefined,
       permissionMode: 'bypassPermissions',
       maxTurns: 30,
+      model: resolveModelId(),  // uses server default
     });
 
     return { result: response.fullText || 'Task completed successfully' };

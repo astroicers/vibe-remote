@@ -5,9 +5,16 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 import { useSettingsStore, VOICE_LANGUAGES } from '../stores/settings';
 import { useAuthStore } from '../stores/auth';
 import { useWorkspaceStore } from '../stores/workspace';
-import { auth } from '../services/api';
+import { auth, models as modelsApi, type ModelInfo } from '../services/api';
 import { ws } from '../services/websocket';
 import { AppLayout } from '../components/AppLayout';
+
+// Hardcoded fallback models in case API is unavailable
+const FALLBACK_MODELS: ModelInfo[] = [
+  { key: 'haiku', name: 'Claude Haiku', description: 'Fastest, for simple tasks', modelId: 'claude-haiku-4-5-20251001' },
+  { key: 'sonnet', name: 'Claude Sonnet', description: 'Fast, efficient for most tasks', modelId: 'claude-sonnet-4-20250514' },
+  { key: 'opus', name: 'Claude Opus', description: 'Most capable, for complex tasks', modelId: 'claude-opus-4-20250514' },
+];
 
 function formatRelativeTime(dateStr: string): string {
   const now = Date.now();
@@ -91,6 +98,34 @@ function Toggle({
   );
 }
 
+// SVG icons for each model key
+function ModelIcon({ modelKey, isSelected }: { modelKey: string; isSelected: boolean }) {
+  const colorClass = isSelected ? 'text-accent' : 'text-text-secondary';
+
+  if (modelKey === 'haiku') {
+    return (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={`w-5 h-5 ${colorClass}`}>
+        <path fillRule="evenodd" d="M12.963 2.286a.75.75 0 0 0-1.071-.136 9.742 9.742 0 0 0-3.539 6.176 7.547 7.547 0 0 1-1.705-1.715.75.75 0 0 0-1.152-.082A9 9 0 1 0 15.68 4.534a7.46 7.46 0 0 1-2.717-2.248ZM15.75 14.25a3.75 3.75 0 1 1-7.313-1.172c.628.465 1.35.81 2.133 1a5.99 5.99 0 0 1 1.925-3.546 3.75 3.75 0 0 1 3.255 3.718Z" clipRule="evenodd" />
+      </svg>
+    );
+  }
+
+  if (modelKey === 'opus') {
+    return (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={`w-5 h-5 ${colorClass}`}>
+        <path fillRule="evenodd" d="M9 4.5a.75.75 0 0 1 .721.544l.813 2.846a3.75 3.75 0 0 0 2.576 2.576l2.846.813a.75.75 0 0 1 0 1.442l-2.846.813a3.75 3.75 0 0 0-2.576 2.576l-.813 2.846a.75.75 0 0 1-1.442 0l-.813-2.846a3.75 3.75 0 0 0-2.576-2.576l-2.846-.813a.75.75 0 0 1 0-1.442l2.846-.813A3.75 3.75 0 0 0 7.466 7.89l.813-2.846A.75.75 0 0 1 9 4.5ZM18 1.5a.75.75 0 0 1 .728.568l.258 1.036c.236.94.97 1.674 1.91 1.91l1.036.258a.75.75 0 0 1 0 1.456l-1.036.258c-.94.236-1.674.97-1.91 1.91l-.258 1.036a.75.75 0 0 1-1.456 0l-.258-1.036a2.625 2.625 0 0 0-1.91-1.91l-1.036-.258a.75.75 0 0 1 0-1.456l1.036-.258a2.625 2.625 0 0 0 1.91-1.91l.258-1.036A.75.75 0 0 1 18 1.5ZM16.5 15a.75.75 0 0 1 .712.513l.394 1.183c.15.447.5.799.948.948l1.183.395a.75.75 0 0 1 0 1.422l-1.183.395c-.447.15-.799.5-.948.948l-.395 1.183a.75.75 0 0 1-1.422 0l-.395-1.183a1.5 1.5 0 0 0-.948-.948l-1.183-.395a.75.75 0 0 1 0-1.422l1.183-.395c.447-.15.799-.5.948-.948l.395-1.183A.75.75 0 0 1 16.5 15Z" clipRule="evenodd" />
+      </svg>
+    );
+  }
+
+  // Default: sonnet (bolt/lightning icon)
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={`w-5 h-5 ${colorClass}`}>
+      <path fillRule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clipRule="evenodd" />
+    </svg>
+  );
+}
+
 export function SettingsPage() {
   const {
     model,
@@ -117,6 +152,21 @@ export function SettingsPage() {
     setSystemPrompt(selectedWorkspace?.systemPrompt || '');
     setPromptDirty(false);
   }, [selectedWorkspace?.id, selectedWorkspace?.systemPrompt]);
+
+  // Models from API
+  const [availableModels, setAvailableModels] = useState<ModelInfo[]>(FALLBACK_MODELS);
+
+  useEffect(() => {
+    modelsApi.list()
+      .then((res) => {
+        if (res.models && res.models.length > 0) {
+          setAvailableModels(res.models);
+        }
+      })
+      .catch(() => {
+        // Use fallback models on error
+      });
+  }, []);
 
   // Auth store
   const authStore = useAuthStore();
@@ -321,49 +371,28 @@ export function SettingsPage() {
         <section>
           <h2 className="text-sm font-medium text-text-muted uppercase tracking-wider px-1 mb-3">AI Model</h2>
           <div className="space-y-2">
-            <button
-              onClick={() => setModel('sonnet')}
-              className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-colors ${
-                model === 'sonnet' ? 'bg-accent/10 border-accent' : 'bg-bg-secondary border-border'
-              }`}
-            >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${model === 'sonnet' ? 'bg-accent/20' : 'bg-bg-tertiary'}`}>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={`w-5 h-5 ${model === 'sonnet' ? 'text-accent' : 'text-text-secondary'}`}>
-                  <path fillRule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="flex-1 text-left">
-                <span className={`font-medium ${model === 'sonnet' ? 'text-accent' : 'text-text-primary'}`}>Claude Sonnet</span>
-                <p className="text-sm text-text-muted">Fast, efficient for most tasks</p>
-              </div>
-              {model === 'sonnet' && (
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-accent">
-                  <path fillRule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
-                </svg>
-              )}
-            </button>
-
-            <button
-              onClick={() => setModel('opus')}
-              className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-colors ${
-                model === 'opus' ? 'bg-accent/10 border-accent' : 'bg-bg-secondary border-border'
-              }`}
-            >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${model === 'opus' ? 'bg-accent/20' : 'bg-bg-tertiary'}`}>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={`w-5 h-5 ${model === 'opus' ? 'text-accent' : 'text-text-secondary'}`}>
-                  <path fillRule="evenodd" d="M9 4.5a.75.75 0 0 1 .721.544l.813 2.846a3.75 3.75 0 0 0 2.576 2.576l2.846.813a.75.75 0 0 1 0 1.442l-2.846.813a3.75 3.75 0 0 0-2.576 2.576l-.813 2.846a.75.75 0 0 1-1.442 0l-.813-2.846a3.75 3.75 0 0 0-2.576-2.576l-2.846-.813a.75.75 0 0 1 0-1.442l2.846-.813A3.75 3.75 0 0 0 7.466 7.89l.813-2.846A.75.75 0 0 1 9 4.5ZM18 1.5a.75.75 0 0 1 .728.568l.258 1.036c.236.94.97 1.674 1.91 1.91l1.036.258a.75.75 0 0 1 0 1.456l-1.036.258c-.94.236-1.674.97-1.91 1.91l-.258 1.036a.75.75 0 0 1-1.456 0l-.258-1.036a2.625 2.625 0 0 0-1.91-1.91l-1.036-.258a.75.75 0 0 1 0-1.456l1.036-.258a2.625 2.625 0 0 0 1.91-1.91l.258-1.036A.75.75 0 0 1 18 1.5ZM16.5 15a.75.75 0 0 1 .712.513l.394 1.183c.15.447.5.799.948.948l1.183.395a.75.75 0 0 1 0 1.422l-1.183.395c-.447.15-.799.5-.948.948l-.395 1.183a.75.75 0 0 1-1.422 0l-.395-1.183a1.5 1.5 0 0 0-.948-.948l-1.183-.395a.75.75 0 0 1 0-1.422l1.183-.395c.447-.15.799-.5.948-.948l.395-1.183A.75.75 0 0 1 16.5 15Z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="flex-1 text-left">
-                <span className={`font-medium ${model === 'opus' ? 'text-accent' : 'text-text-primary'}`}>Claude Opus</span>
-                <p className="text-sm text-text-muted">Most capable, for complex tasks</p>
-              </div>
-              {model === 'opus' && (
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-accent">
-                  <path fillRule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
-                </svg>
-              )}
-            </button>
+            {availableModels.map((m) => (
+              <button
+                key={m.key}
+                onClick={() => setModel(m.key)}
+                className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-colors ${
+                  model === m.key ? 'bg-accent/10 border-accent' : 'bg-bg-secondary border-border'
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${model === m.key ? 'bg-accent/20' : 'bg-bg-tertiary'}`}>
+                  <ModelIcon modelKey={m.key} isSelected={model === m.key} />
+                </div>
+                <div className="flex-1 text-left">
+                  <span className={`font-medium ${model === m.key ? 'text-accent' : 'text-text-primary'}`}>{m.name}</span>
+                  <p className="text-sm text-text-muted">{m.description}</p>
+                </div>
+                {model === m.key && (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-accent">
+                    <path fillRule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </button>
+            ))}
           </div>
         </section>
 

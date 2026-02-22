@@ -6,6 +6,7 @@ import { verifyToken } from '../auth/jwt.js';
 import { getDb, generateId } from '../db/index.js';
 import { getWorkspace } from '../workspace/index.js';
 import { ClaudeSdkRunner, StreamEvent } from '../ai/claude-sdk.js';
+import { resolveModelId } from '../ai/models.js';
 import {
   getConversationHistory,
   saveMessage,
@@ -537,7 +538,7 @@ async function handleChatMessage(
       permissionMode: 'bypassPermissions',
       maxTurns: 20,
       resumeSessionId: conversation.sdk_session_id || undefined,
-      model: data.model,
+      model: resolveModelId(data.model),
     });
 
     // Save assistant message

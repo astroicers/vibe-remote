@@ -4,13 +4,13 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 interface SettingsState {
-  model: 'sonnet' | 'opus';
+  model: string;
   voiceEnabled: boolean;
   voiceLanguage: string;
   autoCommitMsg: boolean;
   projectsPath: string;
 
-  setModel: (model: 'sonnet' | 'opus') => void;
+  setModel: (model: string) => void;
   setVoiceEnabled: (enabled: boolean) => void;
   setVoiceLanguage: (language: string) => void;
   setAutoCommitMsg: (enabled: boolean) => void;

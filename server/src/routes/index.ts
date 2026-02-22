@@ -6,6 +6,7 @@ import diffRoutes from './diff.js';
 import notificationRoutes from './notifications.js';
 import templateRoutes from './templates.js';
 import taskRoutes from './tasks.js';
+import modelRoutes from './models.js';
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use('/diff', diffRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/templates', templateRoutes);
 router.use('/tasks', taskRoutes);
+router.use('/models', modelRoutes);
 
 export default router;
