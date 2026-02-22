@@ -9,6 +9,7 @@ export {
   applyFileActions,
   approveAllChanges,
   rejectAllChanges,
+  filterIgnoredFiles,
 } from './manager.js';
 
 export { parseDiff, formatDiffSummary, generateUnifiedView } from './parser.js';

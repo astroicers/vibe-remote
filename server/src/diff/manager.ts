@@ -5,6 +5,14 @@ import { getGitDiff, stageFiles, discardChanges } from '../workspace/git-ops.js'
 import { parseDiff } from './parser.js';
 import type { DiffReview, FileDiff, DiffComment, FileAction } from './types.js';
 
+// Filter out internal tool config files that should not appear in reviews
+const IGNORED_PREFIXES = ['.claude/', '.vscode/', '.idea/'];
+export function filterIgnoredFiles(files: FileDiff[]): FileDiff[] {
+  return files.filter(
+    (f) => !IGNORED_PREFIXES.some((prefix) => f.path.startsWith(prefix))
+  );
+}
+
 /**
  * Create a new diff review from current git changes
  */
@@ -19,11 +27,7 @@ export async function createDiffReview(
   const diffOutput = await getGitDiff(workspacePath, false);
   const summary = parseDiff(diffOutput);
 
-  // Filter out internal tool config files that should not appear in reviews
-  const IGNORED_PREFIXES = ['.claude/', '.vscode/', '.idea/'];
-  summary.files = summary.files.filter(
-    (f) => !IGNORED_PREFIXES.some((prefix) => f.path.startsWith(prefix))
-  );
+  summary.files = filterIgnoredFiles(summary.files);
 
   if (summary.files.length === 0) {
     throw new Error('No changes to review');
@@ -87,7 +91,7 @@ export function getDiffReview(id: string): DiffReview | null {
     conversationId: row.conversation_id as string,
     workspaceId: row.workspace_id as string,
     status: row.status as DiffReview['status'],
-    files: JSON.parse(row.files_json as string) as FileDiff[],
+    files: filterIgnoredFiles(JSON.parse(row.files_json as string) as FileDiff[]),
     comments: comments.map((c) => ({
       id: c.id as string,
       diffReviewId: c.diff_review_id as string,
@@ -132,7 +136,7 @@ export function listDiffReviews(
     conversationId: row.conversation_id as string,
     workspaceId: row.workspace_id as string,
     status: row.status as DiffReview['status'],
-    files: JSON.parse(row.files_json as string) as FileDiff[],
+    files: filterIgnoredFiles(JSON.parse(row.files_json as string) as FileDiff[]),
     comments: [], // Don't load comments for list view
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,

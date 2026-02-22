@@ -35,6 +35,12 @@ router.get('/', (_req, res) => {
   res.json(workspaces);
 });
 
+// Get default scan path from server config (WORKSPACE_HOST_PATH or fallback)
+router.get('/scan/default-path', (_req, res) => {
+  const defaultPath = config.WORKSPACE_HOST_PATH || '/home/ubuntu';
+  res.json({ path: defaultPath });
+});
+
 // Scan a directory for git repositories (immediate subdirectories with .git)
 router.get('/scan', (req, res) => {
   const scanPath = req.query.path as string | undefined;

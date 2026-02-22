@@ -109,6 +109,9 @@ export const workspaces = {
   scan: (dirPath: string) =>
     request<ScannedRepo[]>(`/workspaces/scan?path=${encodeURIComponent(dirPath)}`),
 
+  getDefaultScanPath: () =>
+    request<{ path: string }>('/workspaces/scan/default-path'),
+
   getFiles: (id: string, depth = 3) =>
     request<FileNode>(`/workspaces/${id}/files?depth=${depth}`),
 
@@ -160,6 +163,9 @@ export const workspaces = {
 
   update: (id: string, data: { name?: string; systemPrompt?: string }) =>
     request<Workspace>(`/workspaces/${id}`, { method: 'PATCH', json: data }),
+
+  delete: (id: string) =>
+    request<{ success: boolean }>(`/workspaces/${id}`, { method: 'DELETE' }),
 };
 
 export interface FileNode {

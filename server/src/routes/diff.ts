@@ -14,6 +14,7 @@ import {
   applyFileActions,
   approveAllChanges,
   rejectAllChanges,
+  filterIgnoredFiles,
   parseDiff,
   generateUnifiedView,
 } from '../diff/index.js';
@@ -46,6 +47,7 @@ router.get('/current', async (req, res) => {
   try {
     const diffOutput = await getGitDiff(workspace.path, false);
     const summary = parseDiff(diffOutput);
+    summary.files = filterIgnoredFiles(summary.files);
 
     res.json({
       workspaceId: workspace.id,

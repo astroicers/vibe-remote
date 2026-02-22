@@ -37,6 +37,7 @@ interface WorkspaceState {
   loadWorkspaces: () => Promise<void>;
   selectWorkspace: (id: string) => void;
   registerWorkspace: (path: string, name?: string) => Promise<void>;
+  removeWorkspace: (id: string) => Promise<void>;
   updateWorkspace: (id: string, data: { name?: string; systemPrompt?: string }) => Promise<void>;
 
   // Git actions — all take workspaceId explicitly
@@ -131,6 +132,34 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to register workspace',
       });
+    }
+  },
+
+  removeWorkspace: async (id: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await workspaces.delete(id);
+      const { selectedWorkspaceId, workspaceList } = get();
+
+      // If deleting the selected workspace, select another
+      if (selectedWorkspaceId === id) {
+        const remaining = workspaceList.filter((w) => w.id !== id);
+        const newSelectedId = remaining.length > 0 ? remaining[0].id : null;
+        if (newSelectedId) {
+          localStorage.setItem('selectedWorkspaceId', newSelectedId);
+        } else {
+          localStorage.removeItem('selectedWorkspaceId');
+        }
+        set({ selectedWorkspaceId: newSelectedId });
+      }
+
+      set({ isLoading: false });
+      get().loadWorkspaces();
+      useToastStore.getState().addToast('Workspace removed', 'success');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to remove workspace';
+      set({ isLoading: false, error: msg });
+      useToastStore.getState().addToast(msg, 'error');
     }
   },
 
