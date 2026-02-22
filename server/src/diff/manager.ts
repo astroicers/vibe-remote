@@ -206,6 +206,54 @@ export function addDiffComment(
 }
 
 /**
+ * Build a feedback prompt from user comments on a diff review.
+ * Groups comments by file path and formats them for the AI.
+ */
+export function buildFeedbackPrompt(
+  review: DiffReview,
+  comments: DiffComment[],
+  filePathFilter?: string[]
+): string {
+  // Filter comments to user-only and optionally by file path
+  let userComments = comments.filter((c) => c.author === 'user');
+  if (filePathFilter && filePathFilter.length > 0) {
+    userComments = userComments.filter((c) => filePathFilter.includes(c.filePath));
+  }
+
+  // Group comments by file path
+  const byFile = new Map<string, DiffComment[]>();
+  for (const comment of userComments) {
+    const existing = byFile.get(comment.filePath) || [];
+    existing.push(comment);
+    byFile.set(comment.filePath, existing);
+  }
+
+  // Build prompt sections
+  const preamble =
+    review.status === 'rejected'
+      ? 'Note: The previous changes were discarded. Please re-implement the changes addressing the following feedback:\n\n'
+      : '';
+
+  let prompt = `${preamble}I received review feedback on my previous changes. Please fix the following issues:\n\n## Rejected Files with Comments\n`;
+
+  for (const [filePath, fileComments] of byFile) {
+    prompt += `\n### ${filePath}\n`;
+    for (const comment of fileComments) {
+      const lineInfo = comment.lineNumber ? ` (line ${comment.lineNumber})` : '';
+      prompt += `- ${comment.content}${lineInfo}\n`;
+    }
+  }
+
+  prompt += `\n## Instructions\n`;
+  prompt += `- Read each file mentioned above\n`;
+  prompt += `- Apply the requested fixes based on the review comments\n`;
+  prompt += `- Do NOT modify files that were not mentioned in the feedback\n`;
+  prompt += `- After making changes, briefly summarize what you fixed\n`;
+
+  return prompt;
+}
+
+/**
  * Apply file actions (approve/reject individual files)
  */
 export async function applyFileActions(

@@ -326,6 +326,12 @@ export const diff = {
       method: 'POST',
       json: { filePath, content, lineNumber },
     }),
+
+  sendFeedback: (id: string, filePathFilter?: string[]) =>
+    request<{ status: string; conversationId: string; message: string }>(
+      `/diff/reviews/${id}/feedback`,
+      { method: 'POST', json: { filePathFilter } }
+    ),
 };
 
 // Notifications API

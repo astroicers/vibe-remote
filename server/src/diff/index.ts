@@ -10,6 +10,7 @@ export {
   approveAllChanges,
   rejectAllChanges,
   filterIgnoredFiles,
+  buildFeedbackPrompt,
 } from './manager.js';
 
 export { parseDiff, formatDiffSummary, generateUnifiedView } from './parser.js';

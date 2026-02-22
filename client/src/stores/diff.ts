@@ -14,6 +14,8 @@ interface WorkspaceDiffState {
   reviews: DiffReview[];
   currentReview: DiffReview | null;
   selectedFile: FileDiff | null;
+  feedbackProcessing: boolean;
+  feedbackOriginalReviewId: string | null;
 }
 
 function createDefaultWorkspaceDiffState(): WorkspaceDiffState {
@@ -22,6 +24,8 @@ function createDefaultWorkspaceDiffState(): WorkspaceDiffState {
     reviews: [],
     currentReview: null,
     selectedFile: null,
+    feedbackProcessing: false,
+    feedbackOriginalReviewId: null,
   };
 }
 
@@ -41,6 +45,8 @@ interface DiffState {
   rejectFile: (workspaceId: string, path: string) => Promise<void>;
   addComment: (workspaceId: string, filePath: string, content: string) => Promise<void>;
   selectFile: (workspaceId: string, file: FileDiff | null) => void;
+  sendFeedback: (workspaceId: string, filePathFilter?: string[]) => Promise<void>;
+  onFeedbackDiffReady: (workspaceId: string, reviewId: string) => void;
   clearError: () => void;
 }
 
@@ -246,6 +252,43 @@ export const useDiffStore = create<DiffState>((set, get) => ({
 
   selectFile: (workspaceId: string, file: FileDiff | null) => {
     set((state) => updateWorkspaceDiff(state, workspaceId, () => ({ selectedFile: file })));
+  },
+
+  sendFeedback: async (workspaceId: string, filePathFilter?: string[]) => {
+    const wsDiff = get().getDiffState(workspaceId);
+    if (!wsDiff.currentReview) return;
+
+    set((state) => updateWorkspaceDiff(state, workspaceId, () => ({
+      feedbackProcessing: true,
+      feedbackOriginalReviewId: wsDiff.currentReview!.id,
+    })));
+
+    try {
+      await diff.sendFeedback(wsDiff.currentReview.id, filePathFilter);
+      // Processing continues in background; WS events will trigger onFeedbackDiffReady
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to send feedback';
+      set((state) => ({
+        ...updateWorkspaceDiff(state, workspaceId, () => ({
+          feedbackProcessing: false,
+          feedbackOriginalReviewId: null,
+        })),
+        error: msg,
+      }));
+      useToastStore.getState().addToast(msg, 'error');
+    }
+  },
+
+  onFeedbackDiffReady: (workspaceId: string, reviewId: string) => {
+    set((state) => updateWorkspaceDiff(state, workspaceId, () => ({
+      feedbackProcessing: false,
+      feedbackOriginalReviewId: null,
+    })));
+
+    if (reviewId) {
+      // Load the new review
+      get().loadReview(workspaceId, reviewId);
+    }
   },
 
   clearError: () => set({ error: null }),

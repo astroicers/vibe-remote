@@ -21,6 +21,7 @@ import {
   LIMITS,
 } from '../utils/truncate.js';
 import { getWatcher, type FileChangeEvent } from '../workspace/watcher.js';
+import { createDiffReview } from '../diff/manager.js';
 
 // Message schemas
 const chatMessageSchema = z.object({
@@ -145,8 +146,8 @@ interface RunnerState {
   workspaceId: string;
   conversationId: string;
 }
-const activeRunners = new Map<string, RunnerState>();
-const MAX_CONCURRENT_RUNNERS = 3;
+export const activeRunners = new Map<string, RunnerState>();
+export const MAX_CONCURRENT_RUNNERS = 3;
 
 function runnerKey(workspaceId: string, conversationId: string): string {
   return `${workspaceId}:${conversationId}`;
@@ -692,4 +693,194 @@ async function handleRetryMessage(
     conversationId: newConversationId,
     message: lastUserMessage.content,
   }, runners);
+}
+
+// Broadcast a message to all authenticated WebSocket clients
+function broadcastToAll(data: Record<string, unknown>): void {
+  const payload = JSON.stringify({
+    ...data,
+    timestamp: new Date().toISOString(),
+  });
+
+  for (const client of connectedClients) {
+    if (client.readyState === client.OPEN && client.isAuthenticated) {
+      client.send(payload);
+    }
+  }
+}
+
+/**
+ * Send feedback from diff review comments to AI for processing.
+ * Called from the REST endpoint; broadcasts events to all authenticated WS clients.
+ */
+export async function sendFeedbackToAI(params: {
+  workspaceId: string;
+  conversationId: string;
+  prompt: string;
+  originalReviewId: string;
+  model?: string;
+}): Promise<void> {
+  const { workspaceId, conversationId, prompt, originalReviewId, model } = params;
+  const db = getDb();
+
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) {
+    throw new Error('Workspace not found');
+  }
+
+  // Get conversation session ID
+  const conversation = db
+    .prepare('SELECT sdk_session_id FROM conversations WHERE id = ?')
+    .get(conversationId) as { sdk_session_id: string | null } | undefined;
+
+  const key = runnerKey(workspaceId, conversationId);
+
+  // Create runner
+  const runner = new ClaudeSdkRunner();
+  activeRunners.set(key, { runner, workspaceId, conversationId });
+
+  // Broadcast feedback_processing event
+  broadcastToAll({
+    type: 'feedback_processing',
+    workspaceId,
+    conversationId,
+    originalReviewId,
+  });
+
+  // Save user message
+  saveMessage(conversationId, 'user', prompt);
+
+  // Accumulate response
+  let fullText = '';
+  const toolCalls: unknown[] = [];
+  const toolResults: unknown[] = [];
+
+  // Set up event handlers — broadcast to all clients
+  runner.on('event', (event: StreamEvent) => {
+    switch (event.type) {
+      case 'text':
+        fullText += event.content || '';
+        broadcastToAll({
+          type: 'chat_chunk',
+          workspaceId,
+          conversationId,
+          text: event.content,
+        });
+        break;
+
+      case 'tool_use':
+        toolCalls.push({
+          name: event.toolName,
+          input: event.toolInput,
+        });
+        broadcastToAll({
+          type: 'tool_use',
+          workspaceId,
+          conversationId,
+          tool: event.toolName,
+          input: event.toolInput,
+        });
+        break;
+
+      case 'tool_result':
+        toolResults.push(event.toolResult);
+        broadcastToAll({
+          type: 'tool_result',
+          workspaceId,
+          conversationId,
+          result: event.toolResult,
+        });
+        break;
+
+      case 'error':
+        broadcastToAll({
+          type: 'chat_error',
+          workspaceId,
+          conversationId,
+          error: event.content,
+        });
+        break;
+
+      case 'done':
+        break;
+    }
+  });
+
+  try {
+    const response = await runner.run(prompt, {
+      workspacePath: workspace.path,
+      systemPrompt: workspace.systemPrompt || undefined,
+      permissionMode: 'bypassPermissions',
+      maxTurns: 20,
+      resumeSessionId: conversation?.sdk_session_id || undefined,
+      model: resolveModelId(model),
+    });
+
+    // Save assistant message
+    saveMessage(
+      conversationId,
+      'assistant',
+      fullText || response.fullText,
+      toolCalls.length > 0 ? toolCalls : undefined,
+      toolResults.length > 0 ? toolResults : undefined
+    );
+
+    // Save session ID for future resume
+    if (response.sessionId && response.sessionId !== conversation?.sdk_session_id) {
+      db.prepare(
+        `UPDATE conversations SET sdk_session_id = ?, updated_at = datetime('now') WHERE id = ?`
+      ).run(response.sessionId, conversationId);
+    }
+
+    // Save token usage
+    if (response.tokenUsage) {
+      db.prepare(
+        `UPDATE conversations SET token_usage = ?, updated_at = datetime('now') WHERE id = ?`
+      ).run(JSON.stringify(response.tokenUsage), conversationId);
+    }
+
+    // If files were modified, create a new diff review
+    if (response.modifiedFiles.length > 0) {
+      try {
+        const newReview = await createDiffReview(workspaceId, workspace.path, conversationId);
+        broadcastToAll({
+          type: 'diff_ready',
+          workspaceId,
+          conversationId,
+          reviewId: newReview.id,
+          files: response.modifiedFiles,
+          isFeedbackResult: true,
+          originalReviewId,
+        });
+      } catch (diffError) {
+        // Diff creation may fail (e.g. no unstaged changes), still broadcast completion
+        console.error('Failed to create diff review after feedback:', diffError);
+        broadcastToAll({
+          type: 'feedback_complete',
+          workspaceId,
+          conversationId,
+          originalReviewId,
+          message: 'AI processed feedback but could not create a diff review.',
+        });
+      }
+    } else {
+      // No file changes
+      broadcastToAll({
+        type: 'feedback_complete',
+        workspaceId,
+        conversationId,
+        originalReviewId,
+        message: 'AI processed feedback but made no file changes.',
+      });
+    }
+  } catch (error) {
+    broadcastToAll({
+      type: 'chat_error',
+      workspaceId,
+      conversationId,
+      error: error instanceof Error ? error.message : 'Feedback processing failed',
+    });
+  } finally {
+    activeRunners.delete(key);
+  }
 }

@@ -1,8 +1,7 @@
 // Diff Comment List Component - Shows comments for a file with Send to AI button
 
-import { useNavigate } from 'react-router-dom';
 import type { DiffComment } from '../../services/api';
-import { useChatStore } from '../../stores/chat';
+import { useDiffStore } from '../../stores/diff';
 import { useWorkspaceStore } from '../../stores/workspace';
 
 interface DiffCommentListProps {
@@ -11,31 +10,26 @@ interface DiffCommentListProps {
 }
 
 export function DiffCommentList({ comments, filePath }: DiffCommentListProps) {
-  const navigate = useNavigate();
   const { selectedWorkspaceId } = useWorkspaceStore();
-  const { sendMessage, createConversation } = useChatStore();
+  const { sendFeedback, getDiffState } = useDiffStore();
 
   if (comments.length === 0) {
     return null;
   }
 
   const userComments = comments.filter((c) => c.author === 'user');
+  const feedbackProcessing = selectedWorkspaceId
+    ? getDiffState(selectedWorkspaceId).feedbackProcessing
+    : false;
 
   const handleSendToAI = async () => {
     if (!selectedWorkspaceId || userComments.length === 0) return;
 
-    const formatted = userComments
-      .map((c) => {
-        const lineInfo = c.lineNumber ? ` (line ${c.lineNumber})` : '';
-        return `- ${c.content}${lineInfo}`;
-      })
-      .join('\n');
-
-    const message = `Please review my feedback on the diff for \`${filePath}\`:\n\n${formatted}`;
-
-    await createConversation(selectedWorkspaceId);
-    sendMessage(selectedWorkspaceId, message);
-    navigate('/chat');
+    try {
+      await sendFeedback(selectedWorkspaceId, [filePath]);
+    } catch {
+      // Error handled by store
+    }
   };
 
   return (
@@ -58,7 +52,8 @@ export function DiffCommentList({ comments, filePath }: DiffCommentListProps) {
       {userComments.length > 0 && (
         <button
           onClick={handleSendToAI}
-          className="w-full flex items-center justify-center gap-2 py-2.5 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 transition-colors"
+          disabled={feedbackProcessing}
+          className="w-full flex items-center justify-center gap-2 py-2.5 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

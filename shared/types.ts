@@ -174,6 +174,8 @@ export type WSEventType =
   | 'task:tool_use'
   | 'task:tool_result'
   | 'task:complete'
+  | 'feedback:processing'
+  | 'feedback:complete'
   | 'notification';
 
 export interface WSEvent<T = unknown> {
