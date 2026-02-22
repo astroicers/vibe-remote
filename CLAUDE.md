@@ -1,3 +1,10 @@
+# AI-SOP-Protocol (ASP) — 行為憲法
+
+> 本專案遵循 ASP 協議。讀取順序：本區塊 → `.ai_profile` → 對應 profiles（按需）
+> 鐵則與 Profile 對應表請見：profiles/global_core.md
+
+---
+
 # CLAUDE.md — Vibe Remote 開發指引
 
 ## 專案概述
