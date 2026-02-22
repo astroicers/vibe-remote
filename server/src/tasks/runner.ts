@@ -13,6 +13,10 @@ import {
   stashChanges,
   popStash,
 } from '../workspace/git-ops.js';
+import { truncateText } from '../utils/truncate.js';
+
+const TOOL_INPUT_TRUNCATE_LIMIT = 500;
+const TOOL_RESULT_TRUNCATE_LIMIT = 1000;
 
 export type TaskEventCallback = (event: {
   type: string;
@@ -106,26 +110,44 @@ export async function runTask(
           }
           break;
 
-        case 'tool_use':
+        case 'tool_use': {
           flushTextBuffer();
+          // Truncate large string values in tool input to avoid oversized WS messages
+          let truncatedInput = event.toolInput;
+          if (event.toolInput && typeof event.toolInput === 'object') {
+            const inputObj = event.toolInput as Record<string, unknown>;
+            truncatedInput = { ...inputObj };
+            for (const [key, value] of Object.entries(inputObj)) {
+              if (typeof value === 'string' && value.length > TOOL_INPUT_TRUNCATE_LIMIT) {
+                (truncatedInput as Record<string, unknown>)[key] = truncateText(value, TOOL_INPUT_TRUNCATE_LIMIT);
+              }
+            }
+          }
           onEvent({
             type: 'task_tool_use',
             taskId: task.id,
             workspaceId: task.workspace_id,
             tool: event.toolName || 'unknown',
-            input: event.toolInput,
+            input: truncatedInput,
           });
           break;
+        }
 
-        case 'tool_result':
+        case 'tool_result': {
+          // Truncate large tool results to avoid oversized WS messages
+          let truncatedResult = event.toolResult;
+          if (typeof event.toolResult === 'string' && event.toolResult.length > TOOL_RESULT_TRUNCATE_LIMIT) {
+            truncatedResult = truncateText(event.toolResult, TOOL_RESULT_TRUNCATE_LIMIT);
+          }
           onEvent({
             type: 'task_tool_result',
             taskId: task.id,
             workspaceId: task.workspace_id,
             tool: event.toolName || 'unknown',
-            result: event.toolResult,
+            result: truncatedResult,
           });
           break;
+        }
 
         case 'error':
           flushTextBuffer();

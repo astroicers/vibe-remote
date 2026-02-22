@@ -68,7 +68,11 @@ export function useTaskWebSocket(): void {
 
       useTaskStore.getState().handleTaskComplete(
         event.taskId,
-        event.workspaceId
+        event.workspaceId,
+        event.status,
+        event.result,
+        event.error,
+        event.modifiedFiles
       );
     });
 

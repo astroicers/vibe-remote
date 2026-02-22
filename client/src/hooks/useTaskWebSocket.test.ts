@@ -207,8 +207,18 @@ describe('useTaskWebSocket', () => {
     });
   });
 
-  it('handles task_complete events by clearing progress', () => {
+  it('handles task_complete events by clearing progress and updating task', () => {
     renderHook(() => useTaskWebSocket());
+
+    // Seed task in store so handleTaskComplete can update it
+    useTaskStore.setState({
+      tasksByWorkspace: {
+        'ws-1': {
+          tasks: [makeTask({ id: 'task-1', workspace_id: 'ws-1', status: 'running' })],
+          activeTaskProgress: {},
+        },
+      },
+    });
 
     // First add some progress
     capturedHandlers['task_progress']!({
@@ -223,17 +233,55 @@ describe('useTaskWebSocket', () => {
     let wsState = useTaskStore.getState().tasksByWorkspace['ws-1'];
     expect(wsState.activeTaskProgress['task-1']).toBeDefined();
 
-    // Now complete
+    // Now complete with all fields
     capturedHandlers['task_complete']!({
       type: 'task_complete',
       taskId: 'task-1',
       workspaceId: 'ws-1',
       status: 'completed',
+      result: 'Feature implemented successfully',
+      modifiedFiles: ['src/index.ts', 'src/utils.ts'],
       timestamp: '2026-02-22T00:00:00Z',
     });
 
     wsState = useTaskStore.getState().tasksByWorkspace['ws-1'];
+    // Progress should be cleared
     expect(wsState.activeTaskProgress['task-1']).toBeUndefined();
+    // Task should be updated with status and result
+    const updatedTask = wsState.tasks.find((t) => t.id === 'task-1');
+    expect(updatedTask).toBeDefined();
+    expect(updatedTask!.status).toBe('completed');
+    expect(updatedTask!.result).toBe('Feature implemented successfully');
+  });
+
+  it('handles task_complete with failed status and error', () => {
+    renderHook(() => useTaskWebSocket());
+
+    // Seed task in store
+    useTaskStore.setState({
+      tasksByWorkspace: {
+        'ws-1': {
+          tasks: [makeTask({ id: 'task-2', workspace_id: 'ws-1', status: 'running' })],
+          activeTaskProgress: {},
+        },
+      },
+    });
+
+    capturedHandlers['task_complete']!({
+      type: 'task_complete',
+      taskId: 'task-2',
+      workspaceId: 'ws-1',
+      status: 'failed',
+      error: 'Branch already exists',
+      modifiedFiles: [],
+      timestamp: '2026-02-22T00:00:00Z',
+    });
+
+    const wsState = useTaskStore.getState().tasksByWorkspace['ws-1'];
+    const failedTask = wsState.tasks.find((t) => t.id === 'task-2');
+    expect(failedTask).toBeDefined();
+    expect(failedTask!.status).toBe('failed');
+    expect(failedTask!.error).toBe('Branch already exists');
   });
 
   it('ignores task_progress with missing taskId', () => {

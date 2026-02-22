@@ -42,7 +42,7 @@ interface TaskState {
   handleTaskProgress: (taskId: string, workspaceId: string, text: string) => void;
   handleTaskToolUse: (taskId: string, workspaceId: string, tool: string, input: unknown) => void;
   handleTaskToolResult: (taskId: string, workspaceId: string, tool: string, result: unknown) => void;
-  handleTaskComplete: (taskId: string, workspaceId: string) => void;
+  handleTaskComplete: (taskId: string, workspaceId: string, status: string, result?: string, error?: string, _modifiedFiles?: string[]) => void;
   clearError: () => void;
 }
 
@@ -274,13 +274,25 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     });
   },
 
-  handleTaskComplete: (taskId: string, workspaceId: string) => {
+  handleTaskComplete: (taskId: string, workspaceId: string, status: string, result?: string, error?: string, _modifiedFiles?: string[]) => {
     set((state) => {
       const wsState = state.tasksByWorkspace[workspaceId] || createDefaultWorkspaceTaskState();
       const { [taskId]: _removed, ...remaining } = wsState.activeTaskProgress;
 
+      // Update the matching task in the tasks array with status/result/error
+      const updatedTasks = wsState.tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        return {
+          ...t,
+          status: status as Task['status'],
+          result: result ?? t.result,
+          error: error ?? t.error,
+        };
+      });
+
       return {
         ...updateWorkspaceTasks(state, workspaceId, () => ({
+          tasks: updatedTasks,
           activeTaskProgress: remaining,
         })),
       };
