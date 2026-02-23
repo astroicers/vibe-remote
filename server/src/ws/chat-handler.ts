@@ -22,6 +22,8 @@ import {
 } from '../utils/truncate.js';
 import { getWatcher, type FileChangeEvent } from '../workspace/watcher.js';
 import { createDiffReview } from '../diff/manager.js';
+import { withTimeout } from '../utils/timeout.js';
+import { config } from '../config.js';
 
 // Message schemas
 const chatMessageSchema = z.object({
@@ -145,6 +147,7 @@ interface RunnerState {
   runner: ClaudeSdkRunner;
   workspaceId: string;
   conversationId: string;
+  createdAt: number;
 }
 export const activeRunners = new Map<string, RunnerState>();
 export const MAX_CONCURRENT_RUNNERS = 3;
@@ -152,6 +155,29 @@ export const MAX_CONCURRENT_RUNNERS = 3;
 function runnerKey(workspaceId: string, conversationId: string): string {
   return `${workspaceId}:${conversationId}`;
 }
+
+// Abort a runner for a specific conversation (used by REST abort endpoint)
+export function abortRunner(workspaceId: string, conversationId: string): boolean {
+  const key = runnerKey(workspaceId, conversationId);
+  const state = activeRunners.get(key);
+  if (!state) return false;
+  state.runner.abort();
+  activeRunners.delete(key);
+  return true;
+}
+
+// Periodic stale runner cleanup — abort runners that exceed 1.5x the timeout
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, state] of activeRunners) {
+    const age = now - state.createdAt;
+    if (age > config.RUNNER_TIMEOUT_MS * 1.5) {
+      console.warn(`Aborting stale runner ${key} (age: ${Math.round(age / 1000)}s)`);
+      state.runner.abort();
+      activeRunners.delete(key);
+    }
+  }
+}, 60000);
 
 export function handleChatWebSocket(ws: AuthenticatedSocket): void {
   // Track this client for broadcasting
@@ -491,7 +517,7 @@ async function handleChatMessage(
 
   // Track runner in activeRunners map
   const key = runnerKey(workspaceId, conversationId);
-  runners.set(key, { runner, workspaceId, conversationId });
+  runners.set(key, { runner, workspaceId, conversationId, createdAt: Date.now() });
 
   // Accumulate response for saving
   let fullText = '';
@@ -550,16 +576,28 @@ async function handleChatMessage(
     }
   });
 
-  // Run Claude SDK
+  // Run Claude SDK with timeout
   try {
-    const response = await runner.run(prompt, {
-      workspacePath: workspace.path,
-      systemPrompt: workspace.systemPrompt || undefined,
-      permissionMode: 'bypassPermissions',
-      maxTurns: 20,
-      resumeSessionId: conversation.sdk_session_id || undefined,
-      model: resolveModelId(data.model),
-    });
+    const response = await withTimeout(
+      runner.run(prompt, {
+        workspacePath: workspace.path,
+        systemPrompt: workspace.systemPrompt || undefined,
+        permissionMode: 'bypassPermissions',
+        maxTurns: 20,
+        resumeSessionId: conversation.sdk_session_id || undefined,
+        model: resolveModelId(data.model),
+      }),
+      config.RUNNER_TIMEOUT_MS,
+      () => {
+        runner.abort();
+        send(ws, {
+          type: 'chat_error',
+          workspaceId,
+          conversationId,
+          error: `AI processing timed out after ${Math.round(config.RUNNER_TIMEOUT_MS / 60000)} minutes`,
+        });
+      }
+    );
 
     // Save assistant message
     saveMessage(
@@ -737,7 +775,7 @@ export async function sendFeedbackToAI(params: {
 
   // Create runner
   const runner = new ClaudeSdkRunner();
-  activeRunners.set(key, { runner, workspaceId, conversationId });
+  activeRunners.set(key, { runner, workspaceId, conversationId, createdAt: Date.now() });
 
   // Broadcast feedback_processing event
   broadcastToAll({
@@ -807,14 +845,26 @@ export async function sendFeedbackToAI(params: {
   });
 
   try {
-    const response = await runner.run(prompt, {
-      workspacePath: workspace.path,
-      systemPrompt: workspace.systemPrompt || undefined,
-      permissionMode: 'bypassPermissions',
-      maxTurns: 20,
-      resumeSessionId: conversation?.sdk_session_id || undefined,
-      model: resolveModelId(model),
-    });
+    const response = await withTimeout(
+      runner.run(prompt, {
+        workspacePath: workspace.path,
+        systemPrompt: workspace.systemPrompt || undefined,
+        permissionMode: 'bypassPermissions',
+        maxTurns: 20,
+        resumeSessionId: conversation?.sdk_session_id || undefined,
+        model: resolveModelId(model),
+      }),
+      config.RUNNER_TIMEOUT_MS,
+      () => {
+        runner.abort();
+        broadcastToAll({
+          type: 'chat_error',
+          workspaceId,
+          conversationId,
+          error: `AI processing timed out after ${Math.round(config.RUNNER_TIMEOUT_MS / 60000)} minutes`,
+        });
+      }
+    );
 
     // Save assistant message
     saveMessage(

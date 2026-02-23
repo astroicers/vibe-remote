@@ -5,6 +5,8 @@
 import type { Task } from './manager.js';
 import { ClaudeSdkRunner, type StreamEvent } from '../ai/claude-sdk.js';
 import { resolveModelId } from '../ai/models.js';
+import { withTimeout } from '../utils/timeout.js';
+import { config } from '../config.js';
 import { getWorkspace } from '../workspace/manager.js';
 import {
   getCurrentBranch,
@@ -161,13 +163,27 @@ export async function runTask(
   }
 
   try {
-    const response = await runner.run(prompt, {
-      workspacePath: workspace.path,
-      systemPrompt: workspace.systemPrompt || undefined,
-      permissionMode: 'bypassPermissions',
-      maxTurns: 30,
-      model: resolveModelId(),  // uses server default
-    });
+    const response = await withTimeout(
+      runner.run(prompt, {
+        workspacePath: workspace.path,
+        systemPrompt: workspace.systemPrompt || undefined,
+        permissionMode: 'bypassPermissions',
+        maxTurns: 30,
+        model: resolveModelId(),  // uses server default
+      }),
+      config.RUNNER_TIMEOUT_MS,
+      () => {
+        runner.abort();
+        onEvent?.({
+          type: 'task_complete',
+          taskId: task.id,
+          workspaceId: task.workspace_id,
+          status: 'failed',
+          error: `Task timed out after ${Math.round(config.RUNNER_TIMEOUT_MS / 60000)} minutes`,
+          modifiedFiles: [],
+        });
+      }
+    );
 
     // Flush any remaining buffered text
     flushTextBuffer();

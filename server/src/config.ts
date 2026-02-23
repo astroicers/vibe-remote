@@ -16,6 +16,7 @@ const envSchema = z.object({
   CLAUDE_PERMISSION_MODE: z
     .enum(['default', 'acceptEdits', 'bypassPermissions'])
     .default('bypassPermissions'),
+  RUNNER_TIMEOUT_MS: z.string().optional().default('600000').transform(Number),  // 10 minutes
 
   // Database
   DATABASE_PATH: z.string().default('./data/vibe-remote.db'),

@@ -236,6 +236,11 @@ export const chat = {
     request<{ success: boolean }>(`/chat/conversations/${id}`, {
       method: 'DELETE',
     }),
+
+  abortConversation: (id: string) =>
+    request<{ success: boolean; message: string }>(`/chat/conversations/${id}/abort`, {
+      method: 'POST',
+    }),
 };
 
 // Diff API
