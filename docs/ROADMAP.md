@@ -96,7 +96,7 @@
 
 **Known gaps** (Phase 1 marked complete but functionality incomplete):
 - QR code pairing -- API complete, frontend only uses dev quick-pair, no QR scan UI
-- Diff comment -> AI feedback -- Comments can be saved, but do not trigger AI re-edit
+- ~~Diff comment -> AI feedback~~ -- [fixed] SPEC-003 實作 diff comment → AI feedback loop
 - Branch management -- API exists, QuickActions lacks branch selection/creation UI
 - Settings persistence -- UI exists, most settings only stored in localStorage
 - Device management -- API exists, Settings page not wired up
@@ -133,6 +133,16 @@
 
 ---
 
+### Bug Fixes & Stability (2026-02-22) [done]
+
+| Fix | SPEC | ADR | Status |
+|-----|------|-----|--------|
+| 訊息去重：修復 React StrictMode 導致 WS handler 重複註冊，訊息顯示兩次 | SPEC-008 | ADR-017 | [done] |
+| Runner Timeout + Abort：為 AI runner 加入超時機制 (10min) 和手動中止能力 | SPEC-009 | ADR-018 | [done] |
+| Tool Approval SDK 接通：將既有 Tool Approval 基礎設施與 SDK `canUseTool` callback 連接 | SPEC-010 | ADR-019 | [done] |
+
+---
+
 ## Phase 2 -- Task Queue: Async Vibe Coding
 
 **Goal**: queue tasks for AI -> AI works in background -> you review later.
@@ -140,23 +150,31 @@
 **Status**: Partially implemented
 
 ### Completed
-- Task CRUD API (`server/src/routes/tasks.ts`)
-- In-memory TaskQueue (`server/src/tasks/queue.ts`)
-- ClaudeSdkRunner runner (`server/src/tasks/runner.ts`)
-- Client: TaskCard, KanbanColumn, TaskCreateSheet components
-- Prompt Templates API (`server/src/routes/templates.ts`)
+
+| Item | SPEC | Status |
+|------|------|--------|
+| Task CRUD API (`server/src/routes/tasks.ts`) | — (Phase 1 MVP) | [done] |
+| In-memory TaskQueue (`server/src/tasks/queue.ts`) | — (Phase 1 MVP) | [done] |
+| ClaudeSdkRunner runner (`server/src/tasks/runner.ts`) | — (Phase 1 MVP) | [done] |
+| Client: TaskCard, KanbanColumn, TaskCreateSheet | — (Phase 1 MVP) | [done] |
+| Prompt Templates API (`server/src/routes/templates.ts`) | — (Phase 1 MVP) | [done] |
+| Task auto branch creation | SPEC-001 | [done] |
+| Task dependencies | SPEC-002 | [done] |
+| Task runner WS streaming | SPEC-004 | [done] |
+| Multi-model settings | SPEC-005 | [done] |
+| Settings persistence (server-side) | SPEC-006 | [done] |
+| Task status WebSocket client wiring | SPEC-007 | [done] |
 
 ### Remaining
-- Task dependencies + batch create
-- BullMQ + Redis (deferred to later phase)
-- Branch auto-creation per task
+- Batch task creation（SPEC-002 有部分基礎，完整 UI 待實作）
+- BullMQ + Redis migration（deferred to later phase）
 
-| Sprint | Content |
-|--------|---------|
-| 2.1 | Task CRUD API + in-memory queue + auto branch |
-| 2.2 | Task runner (AI executes task -> generates diff -> updates status) |
-| 2.3 | Task dependencies + batch create |
-| 2.4 | Client: Tasks page (Kanban UI) + task create form |
+| Sprint | Content | Status |
+|--------|---------|--------|
+| 2.1 | Task CRUD API + in-memory queue + auto branch | [done] SPEC-001 |
+| 2.2 | Task runner (AI executes task -> generates diff -> updates status) | [done] SPEC-004 |
+| 2.3 | Task dependencies + batch create | [partial] SPEC-002 (deps done, batch UI pending) |
+| 2.4 | Client: Tasks page (Kanban UI) + task create form + WS status | [done] SPEC-007 |
 
 **Acceptance scenario**:
 1. Queue 3 tasks during morning commute
