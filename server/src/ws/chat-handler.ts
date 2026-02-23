@@ -5,14 +5,14 @@ import { z } from 'zod';
 import { verifyToken } from '../auth/jwt.js';
 import { getDb, generateId } from '../db/index.js';
 import { getWorkspace } from '../workspace/index.js';
-import { ClaudeSdkRunner, StreamEvent } from '../ai/claude-sdk.js';
+import { ClaudeSdkRunner, StreamEvent, type ClaudeSdkOptions } from '../ai/claude-sdk.js';
 import { resolveModelId } from '../ai/models.js';
 import {
   getConversationHistory,
   saveMessage,
   updateConversationTitle,
 } from '../routes/chat.js';
-import { toolApprovalStore } from './tool-approval.js';
+import { toolApprovalStore, formatToolForDisplay, type ToolUseInfo } from './tool-approval.js';
 import {
   truncateForHistory,
   truncateHistory,
@@ -164,6 +164,65 @@ export function abortRunner(workspaceId: string, conversationId: string): boolea
   state.runner.abort();
   activeRunners.delete(key);
   return true;
+}
+
+/**
+ * Create a canUseTool handler that bridges the SDK's permission callback
+ * to our WebSocket-based tool approval UI.
+ *
+ * Flow: SDK calls canUseTool → broadcast WS event → user approves/rejects
+ * → toolApprovalStore resolves → result returned to SDK
+ */
+function createToolApprovalHandler(
+  workspaceId: string,
+  conversationId: string,
+  deviceId: string
+): NonNullable<ClaudeSdkOptions['canUseTool']> {
+  return async (toolName, input, toolUseId) => {
+    const toolInfo: ToolUseInfo = { id: toolUseId, name: toolName, input };
+    const display = formatToolForDisplay(toolInfo);
+
+    // Broadcast tool_approval_request to all authenticated clients
+    const payload = JSON.stringify({
+      type: 'tool_approval_request',
+      workspaceId,
+      conversationId,
+      toolId: toolUseId,
+      tool: {
+        name: toolName,
+        input,
+        description: display.description,
+        risk: display.risk,
+      },
+      timestamp: new Date().toISOString(),
+    });
+    for (const client of connectedClients) {
+      if (client.readyState === client.OPEN && client.isAuthenticated) {
+        client.send(payload);
+      }
+    }
+
+    // Wait for user approval (built-in 2min timeout + auto-approve for read-only tools)
+    try {
+      const result = await toolApprovalStore.requestApproval(toolInfo, conversationId, deviceId);
+      if (result.approved) {
+        return {
+          behavior: 'allow' as const,
+          updatedInput: result.modifiedInput as Record<string, unknown> | undefined,
+        };
+      }
+      return {
+        behavior: 'deny' as const,
+        message: result.reason || 'User rejected tool use',
+      };
+    } catch (error) {
+      // Timeout or cancellation
+      return {
+        behavior: 'deny' as const,
+        message: error instanceof Error ? error.message : 'Approval timed out',
+      };
+    }
+  };
 }
 
 // Periodic stale runner cleanup — abort runners that exceed 1.5x the timeout
@@ -576,17 +635,25 @@ async function handleChatMessage(
     }
   });
 
+  // Build run options — conditionally wire tool approval
+  const runOptions: ClaudeSdkOptions = {
+    workspacePath: workspace.path,
+    systemPrompt: workspace.systemPrompt || undefined,
+    permissionMode: 'bypassPermissions',
+    maxTurns: 20,
+    resumeSessionId: conversation.sdk_session_id || undefined,
+    model: resolveModelId(data.model),
+  };
+
+  if (config.TOOL_APPROVAL_ENABLED) {
+    runOptions.canUseTool = createToolApprovalHandler(workspaceId, conversationId, ws.deviceId || '');
+    // permissionMode is overridden inside ClaudeSdkRunner when canUseTool is set
+  }
+
   // Run Claude SDK with timeout
   try {
     const response = await withTimeout(
-      runner.run(prompt, {
-        workspacePath: workspace.path,
-        systemPrompt: workspace.systemPrompt || undefined,
-        permissionMode: 'bypassPermissions',
-        maxTurns: 20,
-        resumeSessionId: conversation.sdk_session_id || undefined,
-        model: resolveModelId(data.model),
-      }),
+      runner.run(prompt, runOptions),
       config.RUNNER_TIMEOUT_MS,
       () => {
         runner.abort();
@@ -844,16 +911,25 @@ export async function sendFeedbackToAI(params: {
     }
   });
 
+  // Build run options — conditionally wire tool approval for feedback too
+  const feedbackRunOptions: ClaudeSdkOptions = {
+    workspacePath: workspace.path,
+    systemPrompt: workspace.systemPrompt || undefined,
+    permissionMode: 'bypassPermissions',
+    maxTurns: 20,
+    resumeSessionId: conversation?.sdk_session_id || undefined,
+    model: resolveModelId(model),
+  };
+
+  if (config.TOOL_APPROVAL_ENABLED) {
+    // For feedback, deviceId is not directly available — use empty string
+    // The approval store will still broadcast to all connected clients
+    feedbackRunOptions.canUseTool = createToolApprovalHandler(workspaceId, conversationId, '');
+  }
+
   try {
     const response = await withTimeout(
-      runner.run(prompt, {
-        workspacePath: workspace.path,
-        systemPrompt: workspace.systemPrompt || undefined,
-        permissionMode: 'bypassPermissions',
-        maxTurns: 20,
-        resumeSessionId: conversation?.sdk_session_id || undefined,
-        model: resolveModelId(model),
-      }),
+      runner.run(prompt, feedbackRunOptions),
       config.RUNNER_TIMEOUT_MS,
       () => {
         runner.abort();

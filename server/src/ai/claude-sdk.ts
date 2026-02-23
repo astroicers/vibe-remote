@@ -58,6 +58,15 @@ export interface ClaudeSdkOptions {
   resumeSessionId?: string;
   /** Claude model key (e.g. 'sonnet', 'opus') or full model ID */
   model?: string;
+  /** Custom permission handler for tool approval — called before each tool execution */
+  canUseTool?: (
+    toolName: string,
+    input: Record<string, unknown>,
+    toolUseId: string
+  ) => Promise<
+    | { behavior: 'allow'; updatedInput?: Record<string, unknown> }
+    | { behavior: 'deny'; message: string }
+  >;
 }
 
 export interface ChatResponse {
@@ -91,8 +100,32 @@ export class ClaudeSdkRunner extends EventEmitter {
       // History is sent inline instead. Re-enable when SDK supports stable resume.
     };
 
-    // Handle permission mode
-    if (options.permissionMode === 'bypassPermissions') {
+    // Handle permission mode and canUseTool
+    if (options.canUseTool) {
+      // When canUseTool is provided, use 'default' permission mode so the SDK
+      // invokes our callback. Bypass mode would skip canUseTool entirely.
+      const userHandler = options.canUseTool;
+      sdkOptions.canUseTool = async (
+        toolName: string,
+        input: Record<string, unknown>,
+        sdkOpts: { signal: AbortSignal; toolUseID: string; [key: string]: unknown }
+      ) => {
+        const result = await userHandler(toolName, input, sdkOpts.toolUseID);
+        if (result.behavior === 'allow') {
+          return {
+            behavior: 'allow' as const,
+            updatedInput: result.updatedInput,
+            toolUseID: sdkOpts.toolUseID,
+          };
+        }
+        return {
+          behavior: 'deny' as const,
+          message: result.message,
+          toolUseID: sdkOpts.toolUseID,
+        };
+      };
+      // Do NOT set bypassPermissions or acceptEdits — let canUseTool handle it
+    } else if (options.permissionMode === 'bypassPermissions') {
       sdkOptions.permissionMode = 'bypassPermissions';
       sdkOptions.allowDangerouslySkipPermissions = true;
     } else if (options.permissionMode === 'acceptEdits') {
