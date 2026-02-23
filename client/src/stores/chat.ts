@@ -101,9 +101,20 @@ function updateWorkspaceChat(
   };
 }
 
+// Prevent duplicate WS handler registration (React StrictMode double-mount)
+let wsHandlersInitialized = false;
+
+// Deduplicate messages by ID to prevent double-append from StrictMode or duplicate WS events
+function addMessageIfNotExists(messages: ChatMessage[], msg: ChatMessage): ChatMessage[] {
+  if (messages.some((m) => m.id === msg.id)) return messages;
+  return [...messages, msg];
+}
+
 export const useChatStore = create<ChatState>((set, get) => {
   // Setup WebSocket handlers
   const setupWSHandlers = () => {
+    if (wsHandlersInitialized) return;
+    wsHandlersInitialized = true;
     ws.on('conversation_created', (data) => {
       const workspaceId = data.workspaceId as string;
       const conversationId = data.conversationId as string;
@@ -156,7 +167,7 @@ export const useChatStore = create<ChatState>((set, get) => {
           tokenUsage,
         };
         return updateWorkspaceChat(state, workspaceId, () => ({
-          messages: [...wsChat.messages, newMessage],
+          messages: addMessageIfNotExists(wsChat.messages, newMessage),
           streamingMessage: '',
           isStreaming: false,
           isSending: false,
@@ -334,7 +345,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       };
       set((state) =>
         updateWorkspaceChat(state, workspaceId, (chat) => ({
-          messages: [...chat.messages, userMessage],
+          messages: addMessageIfNotExists(chat.messages, userMessage),
           isSending: true,
         }))
       );
