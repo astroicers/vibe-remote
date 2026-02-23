@@ -6,7 +6,7 @@ RAG Search
 import argparse
 import sys
 
-def search(query: str, top_k: int = 3, index_path: str = ".rag/index"):
+def search(query: str, top_k: int = 3, index_path: str = ".rag/index", model: str = "all-MiniLM-L6-v2"):
     try:
         import chromadb
         from sentence_transformers import SentenceTransformer
@@ -21,7 +21,7 @@ def search(query: str, top_k: int = 3, index_path: str = ".rag/index"):
         print("⚠️  RAG 索引不存在，請先執行：make rag-index")
         sys.exit(1)
 
-    embedder = SentenceTransformer("all-MiniLM-L6-v2")
+    embedder = SentenceTransformer(model)
     query_embedding = embedder.encode([query]).tolist()
 
     results = collection.query(
@@ -50,5 +50,6 @@ if __name__ == "__main__":
     parser.add_argument("--query", required=True)
     parser.add_argument("--top-k", type=int, default=3)
     parser.add_argument("--index", default=".rag/index")
+    parser.add_argument("--model", default="all-MiniLM-L6-v2")
     args = parser.parse_args()
-    search(args.query, args.top_k, args.index)
+    search(args.query, args.top_k, args.index, args.model)

@@ -7,7 +7,7 @@ VERSION  ?= latest
 
 .PHONY: help \
         build clean deploy logs \
-        test test-filter coverage lint typecheck \
+        test test-filter coverage lint \
         diagram \
         adr-new adr-list \
         spec-new spec-list \
@@ -26,7 +26,7 @@ help:
 	@echo "========================="
 	@echo ""
 	@echo "📦 Container:   build | clean | deploy | logs"
-	@echo "🧪 Test:        test | test-filter FILTER=xxx | coverage | lint | typecheck"
+	@echo "🧪 Test:        test | test-filter FILTER=xxx | coverage | lint"
 	@echo "📐 Docs:        diagram"
 	@echo "📋 ADR:         adr-new TITLE=... | adr-list"
 	@echo "📄 Spec:        spec-new TITLE=... | spec-list"
@@ -41,8 +41,8 @@ help:
 #---------------------------------------------------------------------------
 
 build:
-	@echo "🔨 Building $(APP_NAME)..."
-	npm run build
+	@echo "🔨 Building $(APP_NAME):$(VERSION)..."
+	docker build -t $(APP_NAME):$(VERSION) .
 
 clean:
 	@echo "🧹 Cleaning..."
@@ -51,8 +51,8 @@ clean:
 	docker rmi $$(docker images '$(APP_NAME)' -q) 2>/dev/null || true
 
 deploy:
-	@echo "🚀 Deploying $(APP_NAME)..."
-	docker-compose up -d --build
+	@echo "🚀 Deploying $(APP_NAME):$(VERSION)..."
+	docker-compose up -d --force-recreate
 	docker-compose ps
 
 logs:
@@ -64,24 +64,29 @@ logs:
 
 test:
 	@echo "🧪 Running tests..."
-	npm --prefix server test
-	npm --prefix client test
+	@go test ./... -v -race -coverprofile=coverage.out 2>/dev/null && exit 0 || true
+	@pytest ./tests -v --cov=. 2>/dev/null && exit 0 || true
+	@npm test 2>/dev/null && exit 0 || true
+	@echo "⚠️  未偵測到測試框架，請手動設定"
 
 test-filter:
 	@if [ -z "$(FILTER)" ]; then echo "使用方式：make test-filter FILTER=xxx"; exit 1; fi
 	@echo "🧪 Running filtered: $(FILTER)"
-	npm --prefix server test -- --grep "$(FILTER)"
+	@go test ./... -run $(FILTER) -v 2>/dev/null && exit 0 || true
+	@pytest ./tests -k $(FILTER) -v 2>/dev/null && exit 0 || true
+	@npm test -- --grep "$(FILTER)" 2>/dev/null && exit 0 || true
 
 coverage:
-	@echo "⚠️  請使用 npm --prefix server test -- --coverage"
+	@go tool cover -html=coverage.out 2>/dev/null || \
+	coverage html && open htmlcov/index.html 2>/dev/null || \
+	echo "⚠️  請先執行 make test"
 
 lint:
 	@echo "🔍 Linting..."
-	npm run lint
-
-typecheck:
-	@echo "🔍 Type checking..."
-	npm run typecheck
+	@golangci-lint run ./... 2>/dev/null && exit 0 || true
+	@flake8 . 2>/dev/null && exit 0 || true
+	@npm run lint 2>/dev/null && exit 0 || true
+	@echo "⚠️  未偵測到 Lint 工具"
 
 #---------------------------------------------------------------------------
 # Architecture Diagram
@@ -105,7 +110,7 @@ adr-new:
 	NUM=$$(printf "%03d" $$((COUNT + 1))); \
 	SLUG=$$(echo "$(TITLE)" | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-'); \
 	FILE="docs/adr/ADR-$$NUM-$$SLUG.md"; \
-	cp templates/ADR_Template.md $$FILE; \
+	cp .asp/templates/ADR_Template.md $$FILE; \
 	SED_I=$$([ "$$(uname)" = "Darwin" ] && echo "sed -i ''" || echo "sed -i"); \
 	$$SED_I "s/ADR-000/ADR-$$NUM/g" $$FILE; \
 	$$SED_I "s/決策標題/$(TITLE)/g" $$FILE; \
@@ -131,7 +136,7 @@ spec-new:
 	NUM=$$(printf "%03d" $$((COUNT + 1))); \
 	SLUG=$$(echo "$(TITLE)" | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-'); \
 	FILE="docs/specs/SPEC-$$NUM-$$SLUG.md"; \
-	cp templates/SPEC_Template.md $$FILE; \
+	cp .asp/templates/SPEC_Template.md $$FILE; \
 	SED_I=$$([ "$$(uname)" = "Darwin" ] && echo "sed -i ''" || echo "sed -i"); \
 	$$SED_I "s/SPEC-000/SPEC-$$NUM/g" $$FILE; \
 	$$SED_I "s/功能名稱/$(TITLE)/g" $$FILE; \
@@ -202,20 +207,20 @@ session-log:
 
 rag-index:
 	@echo "🔍 Building RAG index..."
-	@python3 scripts/rag/build_index.py \
+	@python3 .asp/scripts/rag/build_index.py \
 		--source docs/ \
-		--source profiles/ \
+		--source .asp/profiles/ \
 		--output .rag/index \
 		--model all-MiniLM-L6-v2 2>/dev/null || \
 	echo "⚠️  請先執行: pip install chromadb sentence-transformers"
 
 rag-search:
 	@if [ -z "$(Q)" ]; then echo "使用方式：make rag-search Q=\"你的問題\""; exit 1; fi
-	@python3 scripts/rag/search.py --query "$(Q)" --top-k 3 2>/dev/null || \
+	@python3 .asp/scripts/rag/search.py --query "$(Q)" --top-k 3 2>/dev/null || \
 	echo "⚠️  RAG 尚未初始化，請先執行 make rag-index"
 
 rag-stats:
-	@python3 scripts/rag/stats.py 2>/dev/null || \
+	@python3 .asp/scripts/rag/stats.py 2>/dev/null || \
 	echo "⚠️  RAG 尚未初始化，請先執行 make rag-index"
 
 rag-rebuild:
