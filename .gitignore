@@ -7,6 +7,10 @@ dist/
 build/
 *.tsbuildinfo
 
+# TypeScript compiled output (source dirs are .ts/.tsx only)
+client/src/**/*.js
+shared/*.js
+
 # Environment
 .env
 .env.local
