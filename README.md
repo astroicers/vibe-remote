@@ -69,15 +69,41 @@ Vibe Remote 讓你在手機上透過自然語言（語音 + 文字）驅動 AI �
 - Node.js 20+
 - Docker + Docker Compose (推薦)
 - Tailscale 已安裝並登入
-- Anthropic API key
+- Claude 認證（擇一，詳見下方）
+
+### Claude 認證設定
+
+Vibe Remote 使用 [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk) 驅動 AI，需要以下任一認證方式：
+
+**方法 A：OAuth Token（推薦，使用 Max/Pro 訂閱額度）**
+
+```bash
+# 1. 安裝 Claude Code CLI
+npm install -g @anthropic-ai/claude-code
+
+# 2. 產生 OAuth Token（瀏覽器會開啟認證頁面）
+claude setup-token
+# 完成後取得 sk-ant-oat01-... 格式的 token
+
+# 3. 寫入 .env
+CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-你的token
+```
+
+**方法 B：Anthropic API Key（按用量付費）**
+
+```bash
+# 1. 前往 https://console.anthropic.com/keys 建立 API Key
+# 2. 寫入 .env
+ANTHROPIC_API_KEY=sk-ant-api03-你的key
+```
 
 ### Docker 啟動（推薦）
 
 ```bash
-git clone https://github.com/anthropicmax/vibe-remote.git
+git clone https://github.com/astroicers/vibe-remote.git
 cd vibe-remote
 cp .env.example .env
-# 編輯 .env 填入 ANTHROPIC_API_KEY 和 WORKSPACE_HOST_PATH
+# 編輯 .env：填入 Claude 認證 token（見上方說明）、JWT_SECRET、WORKSPACE_HOST_PATH
 
 docker compose up -d
 ```
@@ -88,10 +114,10 @@ docker compose up -d
 ### 本地啟動
 
 ```bash
-git clone https://github.com/anthropicmax/vibe-remote.git
+git clone https://github.com/astroicers/vibe-remote.git
 cd vibe-remote
 cp .env.example .env
-# 編輯 .env
+# 編輯 .env（見上方 Claude 認證設定）
 
 # 安裝依賴
 npm install
