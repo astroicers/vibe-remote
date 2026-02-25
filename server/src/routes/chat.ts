@@ -73,11 +73,16 @@ router.get('/conversations/:id', (req, res) => {
     )
     .all(req.params.id);
 
-  // Parse JSON fields
+  // Parse JSON fields (with try-catch for corrupted data)
+  const safeJsonParse = (val: unknown): unknown => {
+    if (!val) return null;
+    try { return JSON.parse(val as string); } catch { return null; }
+  };
+
   const parsedMessages = (messages as Array<Record<string, unknown>>).map((msg) => ({
     ...msg,
-    tool_calls: msg.tool_calls ? JSON.parse(msg.tool_calls as string) : null,
-    tool_results: msg.tool_results ? JSON.parse(msg.tool_results as string) : null,
+    tool_calls: safeJsonParse(msg.tool_calls),
+    tool_results: safeJsonParse(msg.tool_results),
   }));
 
   res.json({

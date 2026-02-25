@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { Component } from 'react';
+import type { ReactNode } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -61,34 +63,20 @@ describe('ErrorBoundary', () => {
   });
 
   it('should catch render errors and show error UI', () => {
-    // Suppress console.error for this test
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const ThrowingComponent = () => {
-      throw new Error('Test render error');
-    };
-
-    // Temporarily override the mock to use a throwing component
-    vi.doMock('./pages/ChatPage', () => ({
-      ChatPage: ThrowingComponent,
-    }));
-
-    // We need to test ErrorBoundary directly since doMock won't work with cached imports
-    // Instead, test with a wrapper that throws
-    const { Component } = require('react');
-
     class TestErrorBoundary extends Component<
-      { children: React.ReactNode },
+      { children: ReactNode },
       { hasError: boolean; error: Error | null }
     > {
-      constructor(props: any) {
-        super(props);
-        this.state = { hasError: false, error: null };
-      }
+      state = { hasError: false, error: null as Error | null };
+
       static getDerivedStateFromError(error: Error) {
         return { hasError: true, error };
       }
+
       componentDidCatch() {}
+
       render() {
         if (this.state.hasError) {
           return (
@@ -128,20 +116,18 @@ describe('ErrorBoundary', () => {
       writable: true,
     });
 
-    const { Component } = require('react');
-
     class TestErrorBoundary extends Component<
-      { children: React.ReactNode },
-      { hasError: boolean; error: Error | null }
+      { children: ReactNode },
+      { hasError: boolean }
     > {
-      constructor(props: any) {
-        super(props);
-        this.state = { hasError: false, error: null };
+      state = { hasError: false };
+
+      static getDerivedStateFromError() {
+        return { hasError: true };
       }
-      static getDerivedStateFromError(error: Error) {
-        return { hasError: true, error };
-      }
+
       componentDidCatch() {}
+
       render() {
         if (this.state.hasError) {
           return <button onClick={() => window.location.reload()}>重新載入</button>;

@@ -173,6 +173,40 @@ describe('Chat Routes', () => {
       const app = createApp();
       return request(app).get('/chat/conversations/nonexistent').expect(404);
     });
+
+    it('should handle corrupted tool_calls JSON in endpoint response', () => {
+      mockDb
+        .prepare(
+          "INSERT INTO messages (id, conversation_id, role, content, tool_calls) VALUES ('msg1', 'conv_test', 'assistant', 'some text', 'not-valid-json{')"
+        )
+        .run();
+
+      const app = createApp();
+      return request(app)
+        .get('/chat/conversations/conv_test')
+        .expect(200)
+        .then((res) => {
+          expect(res.body.messages[0].tool_calls).toBeNull();
+          expect(res.body.messages[0].content).toBe('some text');
+        });
+    });
+
+    it('should handle corrupted tool_results JSON in endpoint response', () => {
+      mockDb
+        .prepare(
+          "INSERT INTO messages (id, conversation_id, role, content, tool_results) VALUES ('msg1', 'conv_test', 'user', 'some text', '{broken')"
+        )
+        .run();
+
+      const app = createApp();
+      return request(app)
+        .get('/chat/conversations/conv_test')
+        .expect(200)
+        .then((res) => {
+          expect(res.body.messages[0].tool_results).toBeNull();
+          expect(res.body.messages[0].content).toBe('some text');
+        });
+    });
   });
 
   describe('saveMessage', () => {
@@ -194,10 +228,6 @@ describe('Chat Routes', () => {
     });
 
     it('should update conversation updated_at timestamp', () => {
-      const before = mockDb
-        .prepare('SELECT updated_at FROM conversations WHERE id = ?')
-        .get('conv_test') as any;
-
       saveMessage('conv_test', 'user', 'trigger update');
 
       const after = mockDb
