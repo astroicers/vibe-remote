@@ -1,228 +1,103 @@
 # AI-SOP-Protocol (ASP) — 行為憲法
 
-> 本專案遵循 ASP 協議。讀取順序：本區塊 → `.ai_profile` → 對應 profiles（按需）
-> 鐵則與 Profile 對應表請見：`.asp/profiles/global_core.md`
-
-### ASP 工作流規則
-
-1. **所有程式碼變更（含 bug fix、既有功能啟用、refactor）都必須先建立 SPEC**
-   - 模板：`.asp/templates/SPEC_Template.md`
-   - 存放：`docs/specs/SPEC-{NNN}-{slug}.md`
-   - 若涉及技術決策（多方案擇一），同時建立 ADR（`docs/adr/ADR-{NNN}-{slug}.md`）
-
-2. **例外情境**（不需 SPEC）：
-   - 純文件修改（docs, README, ROADMAP）
-   - 單行配置修改（`.env`, `docker-compose.yml`）
-   - CLAUDE.md / `.ai_profile` 本身的更新
-
-3. **緊急修復（hotfix）流程**：
-   - 可先實作，但**必須在同一 session 內追溯建立 SPEC**
-   - 追溯 SPEC 需標註 `> 追溯規格書——修復已於 commit {hash} 完成。`
-
-4. **ROADMAP 追蹤**：
-   - 每個 SPEC 實作完成後，更新 `docs/ROADMAP.md` 對應條目
+> 讀取順序：本檔案 → `.ai_profile` → 對應 `.asp/profiles/`（按需）
 
 ---
 
-# CLAUDE.md — Vibe Remote 開發指引
+## 啟動程序
 
-## 專案概述
+1. 讀取 `.ai_profile`，依欄位載入對應 profile
+2. **RAG 已啟用時**：回答任何專案架構/規格問題前，先執行 `make rag-search Q="..."`
+3. 無 `.ai_profile` 時：只套用本檔案鐵則，詢問使用者專案類型
 
-Vibe Remote 是一個 mobile-first PWA，讓工程師在通勤時用手機透過自然語言（語音 + 文字）驅動 AI 完成 coding 任務。它不是 mobile IDE，而是一個「對話 → review diff → approve → commit」的操作介面。
-
-## 文件地圖
-
-開發前請依序閱讀以下文件：
-
-| 文件 | 用途 | 優先序 |
-|------|------|--------|
-| `docs/ARCHITECTURE.md` | 系統架構、元件關係、技術選型 | Required |
-| `docs/API_SPEC.md` | 完整 REST + WebSocket API 規格 | Required |
-| `docs/DATABASE.md` | SQLite schema、資料模型 | Required |
-| `docs/UI_UX.md` | Mobile UI 設計、元件階層 | Recommended (開發前端時必讀) |
-| `docs/AI_ENGINE.md` | AI context building、tool use | Recommended (開發 AI 模組時必讀) |
-| `docs/SECURITY.md` | 認證、授權、安全設計 | Recommended (開發 auth 時必讀) |
-| `docs/DEVELOPMENT.md` | 開發環境、coding standards | Reference |
-| `docs/ROADMAP.md` | 開發階段與驗收標準 | Reference |
-
-## 技術棧
-
-### Server
-- **Runtime**: Node.js 22 (Docker) / 20+ (本地)
-- **Framework**: Express.js + express-ws
-- **Language**: TypeScript (strict mode, `moduleResolution: bundler`)
-- **Database**: SQLite via better-sqlite3 (同步 API，不要用 async wrapper)
-- **AI**: Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`) — 透過 Claude Code CLI 子進程執行
-- **Git**: simple-git
-- **Push notifications**: web-push
-- **Validation**: zod
-- **Dev**: tsx (TypeScript runner), vitest (testing)
-
-### Client (PWA)
-- **Framework**: React 19 with TypeScript
-- **Build**: Vite 6
-- **Styling**: Tailwind CSS 4
-- **State management**: zustand
-- **Routing**: react-router-dom v7
-- **PWA**: vite-plugin-pwa (Workbox)
-- **HTTP client**: 原生 fetch (封裝在 `services/api.ts`)
-- **WebSocket**: 原生 WebSocket + 自動重連 wrapper
-
-### 專案結構
-```
-vibe-remote/
-├── CLAUDE.md              ← 你在這裡
-├── README.md
-├── package.json           # 根 monorepo scripts (concurrently)
-├── docker-compose.yml     # single container :8080
-├── .env.example
-├── shared/
-│   └── types.ts           # Server/Client 共用 types
-├── docs/                  # 8 份設計文件
-├── server/
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── vitest.config.ts
-│   └── src/
-│       ├── index.ts           # Entry: Express + WS server
-│       ├── config.ts          # 環境變數 (dotenv)
-│       ├── auth/              # JWT + QR pairing + middleware
-│       ├── ai/                # Claude SDK runner + context builder
-│       │   ├── claude-sdk.ts  # ClaudeSdkRunner (Agent SDK wrapper)
-│       │   └── context-builder.ts
-│       ├── workspace/         # Git ops + file tree + manager
-│       │   ├── manager.ts     # Workspace CRUD + 路徑掃描
-│       │   ├── git-ops.ts     # simple-git wrapper
-│       │   └── file-tree.ts   # 遞迴目錄讀取
-│       ├── tasks/             # Task queue + runner
-│       │   ├── index.ts       # Task module exports
-│       │   ├── manager.ts     # Task CRUD + lifecycle
-│       │   ├── queue.ts       # In-memory TaskQueue
-│       │   └── runner.ts      # ClaudeSdkRunner (AI task execution)
-│       ├── diff/              # Diff parsing + review manager
-│       ├── notifications/     # Web push (VAPID)
-│       ├── routes/            # REST API handlers
-│       │   ├── auth.ts
-│       │   ├── chat.ts
-│       │   ├── diff.ts
-│       │   ├── tasks.ts       # Task CRUD API
-│       │   ├── templates.ts   # Prompt Templates API
-│       │   ├── workspaces.ts  # 含 GET /scan 端點
-│       │   └── notifications.ts
-│       ├── ws/                # WebSocket handlers
-│       │   ├── chat-handler.ts  # 並行 runner Map (per workspace:conversation)
-│       │   ├── tool-approval.ts
-│       │   └── rate-limit.ts
-│       ├── db/                # SQLite schema + migrations
-│       └── utils/             # truncate 等工具
-├── client/
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── vite.config.ts     # proxy → localhost:8080, PWA config
-│   ├── tsconfig.json
-│   └── src/
-│       ├── App.tsx            # Router + AppLayout
-│       ├── main.tsx           # Entry point
-│       ├── pages/
-│       │   ├── ChatPage.tsx      # AI 對話
-│       │   ├── DiffPage.tsx      # Diff Review
-│       │   ├── ReposPage.tsx     # Workspace 管理 + 自動掃描
-│       │   ├── SettingsPage.tsx  # Projects path + push notifications
-│       │   └── TasksPage.tsx     # 任務列表（Phase 2）
-│       ├── components/
-│       │   ├── AppLayout.tsx         # App shell + WorkspaceTabs
-│       │   ├── WorkspaceTabs.tsx     # 橫向滾動 workspace tabs
-│       │   ├── BottomNav.tsx         # 底部導覽列
-│       │   ├── BottomSheet.tsx       # 通用底部彈出選單
-│       │   ├── ConversationSelector.tsx  # 對話切換
-│       │   ├── Toast.tsx             # Toast 通知
-│       │   ├── chat/                 # ChatInput, MessageBubble, MessageList, etc.
-│       │   ├── diff/                 # DiffViewer, FileList, ReviewActions
-│       │   ├── tasks/               # TaskCard, KanbanColumn, TaskCreateSheet
-│       │   └── actions/              # QuickActions, GitStatusCard, ActionButton
-│       ├── hooks/
-│       │   ├── usePushNotifications.ts
-│       │   └── useSpeech.ts
-│       ├── services/
-│       │   ├── api.ts           # REST API client (fetch wrapper)
-│       │   ├── websocket.ts     # WS client + auto-reconnect
-│       │   ├── push.ts          # Push notification helpers
-│       │   └── speech.ts        # Web Speech API wrapper
-│       ├── stores/              # zustand stores
-│       │   ├── workspace.ts     # 多 workspace 選擇 + git state
-│       │   ├── chat.ts          # Per-workspace chat partition
-│       │   ├── diff.ts          # Per-workspace diff state
-│       │   ├── auth.ts          # Auth token 管理
-│       │   ├── settings.ts      # Settings state
-│       │   ├── tasks.ts         # Task queue state
-│       │   └── toast.ts         # Toast 通知
-│       ├── styles/
-│       │   └── globals.css      # Tailwind imports + custom styles
-│       └── types/               # Client-side types
-└── design/                # Penbook 設計稿
+```yaml
+# .ai_profile 完整欄位參考
+type:      system | content | architecture   # 必填
+mode:      single | multi-agent | committee  # 預設 single
+workflow:  standard | vibe-coding            # 預設 standard
+rag:       enabled | disabled               # 預設 disabled
+guardrail: enabled | disabled               # 預設 disabled
+hitl:      minimal | standard | strict      # 預設 standard
+name:      your-project-name
 ```
 
-## 核心架構特性
+**Profile 對應表：**
 
-### Multi-Workspace 並行開發
-- **Server**: `chat-handler.ts` 使用 `Map<string, RunnerState>` 支援最多 3 個並行 AI runner
-- **Client**: 所有 store 使用 `Record<string, WorkspaceState>` 按 workspace 分區
-- **WebSocket**: 所有事件攜帶 `workspaceId` 路由到正確分區
-- **UI**: WorkspaceTabs 支援 tab 切換、未讀紅點、processing indicator
+| 欄位值 | 載入的 Profile |
+|--------|----------------|
+| `type: system` | `.asp/profiles/global_core.md` + `.asp/profiles/system_dev.md` |
+| `type: content` | `.asp/profiles/global_core.md` + `.asp/profiles/content_creative.md` |
+| `type: architecture` | `.asp/profiles/global_core.md` + `.asp/profiles/system_dev.md` |
+| `mode: multi-agent` | + `.asp/profiles/multi_agent.md` |
+| `mode: committee` | + `.asp/profiles/committee.md` |
+| `workflow: vibe-coding` | + `.asp/profiles/vibe_coding.md` |
+| `rag: enabled` | + `.asp/profiles/rag_context.md` |
+| `guardrail: enabled` | + `.asp/profiles/guardrail.md` |
 
-### AI Engine
-- 使用 **Claude Agent SDK** (`@anthropic-ai/claude-agent-sdk`)，非直接 API 呼叫
-- Agent SDK 需要系統安裝 `@anthropic-ai/claude-code` CLI
-- 支援 Session Resume（`sdk_session_id` 儲存於 DB）降低 token 消耗
-- 內建工具：Read, Write, Edit, Bash, Grep, Glob
-- Context Builder 自動注入 workspace 的 file tree + git status + system prompt
+---
 
-### Docker 單容器架構 (Multi-stage Build)
-- **vibe-remote** container (port 8080): Express API + WebSocket + SPA static files + Claude CLI
-- Dockerfile 三階段：client build → server build → runtime（serve both）
-- Workspace 目錄透過 volume mount 共享 (`WORKSPACE_HOST_PATH` → `/workspace`)
+## 🔴 鐵則（不可覆蓋）
 
-## Coding Standards
+以下規則在任何情況下不得繞過：
 
-### TypeScript
-- `strict: true` 在所有 tsconfig
-- 永遠用 `interface` 而非 `type` 來定義物件形狀（除非需要 union type）
-- 所有 API request/response 用 zod schema 驗證
-- 不要用 `any`，用 `unknown` + type guard
+| 鐵則 | 說明 |
+|------|------|
+| **副作用防護** | `git push / deploy / rm -rf` 執行前必須確認（由 Hooks 技術強制） |
+| **不擅自推版** | 禁止自行執行 `git push / helm upgrade / kubectl apply`（由 Hooks 技術強制） |
+| **敏感資訊保護** | 禁止輸出任何 API Key、密碼、憑證，無論何種包裝方式 |
+| **Makefile 優先** | 有對應 make 目標時，禁止輸出原生長指令 |
 
-### 命名規則
-- 檔案：kebab-case (`context-builder.ts`)
-- Component：PascalCase (`ChatInput.tsx`)
-- 函式/變數：camelCase
-- 常數：UPPER_SNAKE_CASE
-- Database columns：snake_case
+---
 
-### Error Handling
-- Server: 統一 error response format `{ error: string, code: string, details?: unknown }`
-- Client: 全域 error boundary + toast notification
-- 永遠 catch async errors，不要讓 promise 靜默失敗
+## 🟡 預設行為（有充分理由可調整，但必須說明）
 
-### Git Conventions
-- Commit message: Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`)
-- Branch: `feat/xxx`, `fix/xxx`, `chore/xxx`
+| 預設行為 | 可跳過的條件 |
+|----------|-------------|
+| ADR 優先於實作 | 修改範圍僅限單一函數，且無架構影響 |
+| TDD：測試先於代碼 | 原型驗證階段，需標記 `tech-debt: test-pending` |
+| 非 trivial Bug 修復需建 SPEC | trivial（單行/typo/配置）可豁免，需說明理由 |
+| 文件同步更新 | 緊急修復可延後，但必須在 24h 內補文件 |
+| SPEC 先於原始碼修改 | trivial（單行/typo/配置）可豁免，需說明理由（由 Hook 技術提醒） |
+| Bug 修復後 grep 全專案 | 確認為單點配置錯誤時可豁免 |
 
-## 關鍵設計決策
+---
 
-1. **Monorepo 但不用 workspace manager** — 用 `npm --prefix server` / `npm --prefix client` + root `concurrently`
-2. **SQLite 不是 PostgreSQL** — 個人工具/小團隊工具，SQLite 足夠且零維護
-3. **better-sqlite3 是同步的** — 刻意選擇，同步 API 更簡單，SQLite 本地磁碟夠快
-4. **Claude Agent SDK 而非直接 API** — 內建工具（file ops, git, bash）+ session resume
-5. **不做 SSR** — 純 SPA，透過 Tailscale 存取，不需要 SEO
-6. **WebSocket 用於 streaming** — AI 回覆和即時狀態用 WebSocket，CRUD 走 REST
-7. **Per-workspace state partitioning** — Client stores 使用 `Record<workspaceId, State>` 支援並行
+## 標準工作流
 
-## 常見陷阱
+```
+需求 → [ADR 建立] → SDD 設計 → TDD 測試 → 實作 → 文件同步 → 確認後部署
+         ↑ 架構影響時必須        ↑ 預設行為，可調整
+```
 
-- WARNING: `better-sqlite3` 是 native module，Docker 需要 python3 + make + g++ build 環境
-- WARNING: Claude Agent SDK 需要 `@anthropic-ai/claude-code` CLI 全域安裝
-- WARNING: Claude CLI 以 root 執行會拒絕 `--dangerously-skip-permissions`，Docker 中用 `node` user
-- WARNING: PWA push notification 在 iOS 要 iOS 16.4+，需要用戶手動「加到主畫面」
-- WARNING: Docker workspace 路徑映射：host path ≠ container path，用 `WORKSPACE_HOST_PATH` / `WORKSPACE_CONTAINER_PATH` 設定
-- WARNING: 同一 conversation 不允許兩個 runner 同時執行（Map key 檢查防 race condition）
-- WARNING: `MAX_CONCURRENT_RUNNERS = 3` 限制並行 AI 處理，每個 runner spawn 子進程消耗記憶體
+---
+
+## Makefile 速查
+
+| 動作 | 指令 |
+|------|------|
+| 建立 Image | `make build` |
+| 清理環境 | `make clean` |
+| 重新部署 | `make deploy` |
+| 執行測試 | `make test` |
+| 局部測試 | `make test-filter FILTER=xxx` |
+| 新增 ADR | `make adr-new TITLE="..."` |
+| 新增規格書 | `make spec-new TITLE="..."` |
+| 查詢知識庫 | `make rag-search Q="..."` |
+| Agent 完成回報 | `make agent-done TASK=xxx STATUS=success` |
+| 儲存 Session | `make session-checkpoint NEXT="..."` |
+
+> 以上為常用指令，完整列表請執行 `make help`
+
+---
+
+## 技術執行層（Hooks）
+
+ASP 使用 Claude Code Hooks 技術強制執行鐵則，不依賴 AI 自律：
+
+| Hook | 攔截對象 | 行為 |
+|------|---------|------|
+| `enforce-side-effects.sh` | 副作用指令（git push, deploy, rm -rf） | 原生確認對話框 |
+| `enforce-workflow.sh` | 原始碼修改（Edit/Write） | 依 HITL 等級彈出工作流斷點 + SPEC 存在性檢查 |
+
+> Hooks 使用 `permissionDecision: "ask"`，人類可覆蓋。
+> 設定檔位於 `.claude/settings.json`，hook 腳本位於 `.asp/hooks/`。

@@ -25,12 +25,6 @@
       window.addEventListener('unhandledrejection', function(e) {
         _errors.push('Promise: ' + (e.reason && e.reason.message || e.reason || 'unknown'));
       });
-      // Unregister stale service workers
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(regs) {
-          regs.forEach(function(r) { r.unregister(); });
-        });
-      }
       // Fallback: show captured errors if React fails to render
       setTimeout(function() {
         var root = document.getElementById('root');

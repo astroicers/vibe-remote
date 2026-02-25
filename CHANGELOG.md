@@ -11,6 +11,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - Client displays relative paths in Add Workspace modal for nested repos
 - `.env.example` now documents all 25 configurable parameters
 
+### Fixed
+- Android PWA install: added PNG icons (192x192, 512x512, maskable variants) required by Android Chrome
+- Removed service worker force-unregister script that prevented PWA installation
+
 ## [0.1.0] — 2026-02-22
 
 ### Added

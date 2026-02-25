@@ -56,3 +56,6 @@ docs/session-log.md
 # Misc
 *.pem
 *.key
+CLAUDE.md.pre-upgrade
+.asp-tmp/
+*.out
