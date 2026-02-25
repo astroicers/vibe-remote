@@ -71,8 +71,8 @@
 
 - [x] `cd server && npx tsc --noEmit` 無錯誤
 - [x] `cd client && npx tsc --noEmit` 無錯誤
-- [x] `npm --prefix server run test:run` 全數通過（155 tests）
-- [x] `npm --prefix client run test:run` 全數通過（139 tests）
+- [x] `npm --prefix server run test:run` 全數通過（185 tests）
+- [x] `npm --prefix client run test:run` 全數通過（145 tests）
 - [x] setInterval handle 已導出，shutdown 時 clearInterval
 - [x] JSON.parse 有 try-catch fallback
 - [x] ReviewStatus 統一為 'partial'
