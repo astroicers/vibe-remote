@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import crypto from 'node:crypto';
 import { z } from 'zod';
 
 const envSchema = z.object({
@@ -7,7 +8,7 @@ const envSchema = z.object({
   HOST: z.string().default('0.0.0.0'),
 
   // JWT
-  JWT_SECRET: z.string().min(32),
+  JWT_SECRET: z.string().min(32).default(crypto.randomBytes(32).toString('hex')),
   JWT_EXPIRES_IN: z.string().default('7d'),
 
   // Claude Agent SDK
@@ -41,6 +42,10 @@ function loadConfig() {
     console.error('❌ Invalid environment variables:');
     console.error(result.error.format());
     process.exit(1);
+  }
+
+  if (!process.env.JWT_SECRET) {
+    console.warn('⚠️  JWT_SECRET not set — using auto-generated secret (tokens will not survive restart)');
   }
 
   return result.data;
