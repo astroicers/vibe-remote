@@ -22,12 +22,13 @@ GitHub CLI (gh)          — PR 相關操作
 
 ```bash
 # Clone
-git clone https://github.com/YOUR_USERNAME/vibe-remote.git
+git clone https://github.com/astroicers/vibe-remote.git
 cd vibe-remote
 
 # 環境變數
 cp .env.example .env
-# 編輯 .env，填入認證資訊（CLAUDE_CODE_OAUTH_TOKEN 或 ANTHROPIC_API_KEY）和 JWT_SECRET
+# 編輯 .env，填入認證資訊（CLAUDE_CODE_OAUTH_TOKEN 或 ANTHROPIC_API_KEY）
+# JWT_SECRET 可留空（自動產生，重啟後 token 失效；production 建議明確設定）
 
 # 安裝依賴
 cd server && npm install && cd ..
@@ -416,110 +417,96 @@ export default defineConfig({
 });
 ```
 
-Docker 內 client 透過 `VITE_API_URL=http://server:8080` 指向同網路內的 server container。
-
 ## Docker
 
 ### 架構
 
-Docker Compose 使用雙容器架構（而非單一容器）：
+Docker 使用**單容器 multi-stage build**：Dockerfile 三階段編譯 client → server → runtime，最終由 Express 同時 serve API + SPA static files。
 
 ```
-┌─────────────────────────────────────────────┐
-│ Docker Compose (vibe-network bridge)        │
-│                                             │
-│  ┌─────────────┐     ┌──────────────┐       │
-│  │   server     │     │    client    │       │
-│  │ Node 22-slim │     │ Node 22-slim │       │
-│  │ Port: 8080   │◄────│ VITE proxy   │       │
-│  │ SQLite + SDK │     │ Port: 5173   │       │
-│  └──────┬───────┘     └──────┬───────┘       │
-│         │                    │               │
-└─────────┼────────────────────┼───────────────┘
-          │                    │
-     host:8080            host:8081
+┌──────────────────────────────────────────────┐
+│ Docker Compose                               │
+│                                              │
+│  ┌────────────────────────────────────┐      │
+│  │  vibe-remote (single container)    │      │
+│  │  Node 22-slim                      │      │
+│  │  Port: 8080                        │      │
+│  │  ├── /api/*  → REST endpoints      │      │
+│  │  ├── /ws     → WebSocket           │      │
+│  │  └── /*      → SPA (client/dist)   │      │
+│  │  SQLite + Claude CLI               │      │
+│  └────────────────┬───────────────────┘      │
+│                   │                          │
+└───────────────────┼──────────────────────────┘
+                    │
+               host:8080
 ```
 
-### Server Dockerfile
+### Dockerfile (Multi-stage)
 
 ```dockerfile
-FROM node:22-slim
+# Stage 1: Build client
+FROM node:22-slim AS client-build
+WORKDIR /app/client
+COPY client/package*.json ./
+RUN npm ci
+COPY client/ .
+RUN npm run build
 
+# Stage 2: Build server
+FROM node:22-slim AS server-build
 WORKDIR /app
-
-# better-sqlite3 需要 build tools
-RUN apt-get update && apt-get install -y \
-    python3 make g++ git \
-    && rm -rf /var/lib/apt/lists/*
-
-# Claude Code CLI（Agent SDK 依賴）
+RUN apt-get update && apt-get install -y python3 make g++ git && rm -rf /var/lib/apt/lists/*
 RUN npm install -g @anthropic-ai/claude-code
-
-COPY package*.json ./
+COPY server/package*.json ./
 RUN npm ci
+COPY server/ .
 
-COPY . .
-
-# 建立資料目錄和 workspace mount point
-# node user (uid 1000) 對應 host ubuntu user (uid 1000)
-RUN mkdir -p data /workspace && \
-    chown -R node:node /app /workspace
-
-EXPOSE 8080
-
-# Claude CLI 拒絕以 root 執行 --dangerously-skip-permissions
-USER node
-
-CMD ["npx", "tsx", "src/index.ts"]
-```
-
-### Client Dockerfile
-
-```dockerfile
+# Stage 3: Runtime
 FROM node:22-slim
-
 WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci
-COPY . .
-
-EXPOSE 5173
-
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+RUN apt-get update && apt-get install -y python3 make g++ git curl && rm -rf /var/lib/apt/lists/*
+RUN npm install -g @anthropic-ai/claude-code
+COPY --from=server-build /app ./
+COPY --from=client-build /app/client/dist /client/dist
+RUN mkdir -p data /workspace && chown -R node:node /app /workspace
+EXPOSE 8080
+USER node
+ENV NODE_ENV=production
+CMD ["npx", "tsx", "src/index.ts"]
 ```
 
 ### docker-compose.yml
 
 ```yaml
 services:
-  server:
-    build: { context: ./server, dockerfile: Dockerfile }
+  vibe-remote:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
     ports: ["8080:8080"]
     volumes:
-      - /home/ubuntu:/workspace:rw        # Workspace 掛載
-      - ./server/data:/app/data            # DB 持久化
-      - ~/.claude:/home/node/.claude:rw    # Claude SDK credentials
+      - ${WORKSPACE_HOST_PATH:-/home/ubuntu}:/workspace:rw
+      - vibe-data:/app/data
+      - ${HOME}/.claude:/home/node/.claude:rw
     environment:
+      - NODE_ENV=production
       - PORT=8080
-      - JWT_SECRET=dev-secret-key-...
+      - HOST=0.0.0.0
+      - JWT_SECRET=${JWT_SECRET:-}
       - CLAUDE_PERMISSION_MODE=bypassPermissions
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
-      - WORKSPACE_HOST_PATH=/home/ubuntu
+      - WORKSPACE_HOST_PATH=${WORKSPACE_HOST_PATH:-/home/ubuntu}
       - WORKSPACE_CONTAINER_PATH=/workspace
-    networks: [vibe-network]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
 
-  client:
-    build: { context: ./client, dockerfile: Dockerfile }
-    ports: ["8081:5173"]
-    environment:
-      - VITE_API_URL=http://server:8080
-    depends_on: [server]
-    networks: [vibe-network]
-
-networks:
-  vibe-network:
-    driver: bridge
+volumes:
+  vibe-data:
 ```
 
 ### Docker 啟動
@@ -597,9 +584,9 @@ npm --prefix client run test:run    # Single run
 
 ### 測試現況
 
-**Total: 236 tests（Server 116 + Client 120）**
+**Total: 294 tests（Server 155 + Client 139）**
 
-Server test files (9):
+Server test files (13):
 
 ```
 server/src/auth/jwt.test.ts
@@ -607,13 +594,18 @@ server/src/ws/rate-limit.test.ts
 server/src/ws/tool-approval.test.ts
 server/src/workspace/manager.test.ts
 server/src/workspace/watcher.test.ts
+server/src/tasks/manager.test.ts
 server/src/tasks/queue.test.ts
 server/src/tasks/runner.test.ts
+server/src/routes/diff.test.ts
 server/src/routes/tasks.test.ts
 server/src/routes/templates.test.ts
+server/src/routes/settings.test.ts
+server/src/routes/models.test.ts
+server/src/ai/models.test.ts
 ```
 
-Client test files (15):
+Client test files (16):
 
 ```
 client/src/components/ConfirmDialog.test.tsx
@@ -631,6 +623,7 @@ client/src/pages/ChatPage.test.tsx
 client/src/pages/DiffPage.test.tsx
 client/src/stores/settings.test.ts
 client/src/stores/toast.test.ts
+client/src/hooks/useTaskWebSocket.test.ts
 ```
 
 ### 測試策略

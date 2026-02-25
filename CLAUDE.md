@@ -74,7 +74,7 @@ vibe-remote/
 ├── CLAUDE.md              ← 你在這裡
 ├── README.md
 ├── package.json           # 根 monorepo scripts (concurrently)
-├── docker-compose.yml     # server:8080, client:8081
+├── docker-compose.yml     # single container :8080
 ├── .env.example
 ├── shared/
 │   └── types.ts           # Server/Client 共用 types
@@ -178,9 +178,9 @@ vibe-remote/
 - 內建工具：Read, Write, Edit, Bash, Grep, Glob
 - Context Builder 自動注入 workspace 的 file tree + git status + system prompt
 
-### Docker 雙容器架構
-- **server** container (port 8080): Express API + WebSocket + Claude CLI
-- **client** container (port 8081): Vite dev server (proxy → server)
+### Docker 單容器架構 (Multi-stage Build)
+- **vibe-remote** container (port 8080): Express API + WebSocket + SPA static files + Claude CLI
+- Dockerfile 三階段：client build → server build → runtime（serve both）
 - Workspace 目錄透過 volume mount 共享 (`WORKSPACE_HOST_PATH` → `/workspace`)
 
 ## Coding Standards

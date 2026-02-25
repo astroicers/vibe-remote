@@ -66,17 +66,14 @@
 
 ### 1. API Gateway
 
-Express.js HTTP server + WebSocket server 共享同一個 port。Docker 部署模式下 server (port 8080) 和 client (port 8081) 分離。
+Express.js HTTP server + WebSocket server 共享同一個 port。Docker 部署使用單一容器 (port 8080)，server 同時 serve API 和 SPA static files。
 
 ```
-Docker 部署:
-  server:8080
+Docker 部署（單容器 multi-stage build）:
+  vibe-remote:8080
   ├── GET/POST/PATCH/DELETE /api/*  → REST endpoints
-  └── WS /ws                        → WebSocket (AI streaming, tool approval)
-
-  client:8081
-  ├── Vite dev server (React PWA)
-  └── Proxy /api → server:8080, /ws → server:8080
+  ├── WS /ws                        → WebSocket (AI streaming, tool approval)
+  └── /*                            → SPA static files (client/dist)
 ```
 
 **Routes** (`server/src/routes/`):
@@ -295,34 +292,35 @@ All files approved?
 ### Docker 部署（目前使用）
 
 ```yaml
-# docker-compose.yml
+# docker-compose.yml（單容器 multi-stage build）
 services:
-  server:
-    build: ./server
+  vibe-remote:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
     ports: ["8080:8080"]
     volumes:
-      - /home/ubuntu:/workspace:rw          # 工作目錄
-      - ./server/data:/app/data             # SQLite 持久化
-      - ~/.claude:/home/node/.claude:rw     # Claude SDK 認證
+      - ${WORKSPACE_HOST_PATH:-/home/ubuntu}:/workspace:rw
+      - vibe-data:/app/data
+      - ~/.claude:/home/node/.claude:rw
     environment:
-      - WORKSPACE_HOST_PATH=/home/ubuntu
-      - WORKSPACE_CONTAINER_PATH=/workspace
-      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
+      - NODE_ENV=production
+      - PORT=8080
+      - JWT_SECRET=${JWT_SECRET:-}
       - CLAUDE_PERMISSION_MODE=bypassPermissions
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
+      - WORKSPACE_HOST_PATH=${WORKSPACE_HOST_PATH:-/home/ubuntu}
+      - WORKSPACE_CONTAINER_PATH=/workspace
 
-  client:
-    build: ./client
-    ports: ["8081:5173"]
-    environment:
-      - VITE_API_URL=http://server:8080     # Vite proxy target
+volumes:
+  vibe-data:
 ```
 
 ### 與 code-server 的共存
 
 ```
 同一台 Server:
-├── port 8080: Vibe Remote Server (API + WS)
-├── port 8081: Vibe Remote Client (React PWA)
+├── port 8080: Vibe Remote（API + WS + SPA，單容器）
 ├── code-server (電腦用)
 └── ~/projects/: 共享的檔案系統
 

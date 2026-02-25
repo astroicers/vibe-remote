@@ -43,11 +43,12 @@ Vibe Remote 讓你在手機上透過自然語言（語音 + 文字）驅動 AI �
 - **PWA**: install to home screen, offline cache
 - **Task Queue + Kanban UI**: async task queue with kanban board, task CRUD, in-memory queue, AI runner
 - **Prompt Templates**: template API with seed data for common coding tasks
+- **Multi-Model Settings**: configurable AI model (Sonnet/Opus), server-side persistence
+- **Settings Persistence**: server-side settings storage via REST API
 
 ### Planned
 - GitHub/GitLab integration
 - Voice input (Web Speech API)
-- Multi-model switching
 
 ## 技術棧
 
@@ -103,13 +104,13 @@ ANTHROPIC_API_KEY=sk-ant-api03-你的key
 git clone https://github.com/astroicers/vibe-remote.git
 cd vibe-remote
 cp .env.example .env
-# 編輯 .env：填入 Claude 認證 token（見上方說明）、JWT_SECRET、WORKSPACE_HOST_PATH
+# 編輯 .env：填入 Claude 認證 token（見上方說明）、WORKSPACE_HOST_PATH
+# JWT_SECRET 可留空（自動產生，但重啟後 token 失效；production 建議明確設定）
 
 docker compose up -d
 ```
 
-- Server API: `http://localhost:8080`
-- Client UI: `http://localhost:8081`
+- Vibe Remote: `http://localhost:8080`（API + Client 同一容器）
 
 ### 本地啟動
 
@@ -133,7 +134,7 @@ npm run dev
 
 ### 手機連線
 1. 確保手機和 server 都在 Tailscale 網路中
-2. 打開 `http://YOUR_TAILSCALE_IP:8081`（Docker）或 `:5173`（本地）
+2. 打開 `http://YOUR_TAILSCALE_IP:8080`（Docker）或 `:5173`（本地）
 3. 首次使用：Settings → Quick Pair（dev mode）或 QR code pairing
 4. Safari/Chrome → 「加到主畫面」安裝 PWA
 
@@ -163,8 +164,7 @@ npm --prefix client test
 docker compose up -d
 
 # 查看日誌
-docker compose logs -f server
-docker compose logs -f client
+docker compose logs -f vibe-remote
 
 # 重建
 docker compose up -d --build
