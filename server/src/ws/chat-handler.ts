@@ -5,13 +5,14 @@ import { z } from 'zod';
 import { verifyToken } from '../auth/jwt.js';
 import { getDb, generateId } from '../db/index.js';
 import { getWorkspace } from '../workspace/index.js';
-import { ClaudeSdkRunner, StreamEvent } from '../ai/claude-sdk.js';
+import { ClaudeSdkRunner, StreamEvent, type ClaudeSdkOptions } from '../ai/claude-sdk.js';
+import { resolveModelId } from '../ai/models.js';
 import {
   getConversationHistory,
   saveMessage,
   updateConversationTitle,
 } from '../routes/chat.js';
-import { toolApprovalStore } from './tool-approval.js';
+import { toolApprovalStore, formatToolForDisplay, type ToolUseInfo } from './tool-approval.js';
 import {
   truncateForHistory,
   truncateHistory,
@@ -20,6 +21,9 @@ import {
   LIMITS,
 } from '../utils/truncate.js';
 import { getWatcher, type FileChangeEvent } from '../workspace/watcher.js';
+import { createDiffReview } from '../diff/manager.js';
+import { withTimeout } from '../utils/timeout.js';
+import { config } from '../config.js';
 
 // Message schemas
 const chatMessageSchema = z.object({
@@ -92,6 +96,25 @@ export function broadcastTaskStatus(task: Record<string, unknown>): void {
   }
 }
 
+// Broadcast task execution events (progress, tool use, completion) to all clients
+export function broadcastTaskEvent(event: {
+  type: string;
+  taskId: string;
+  workspaceId: string;
+  [key: string]: unknown;
+}): void {
+  const payload = JSON.stringify({
+    ...event,
+    timestamp: new Date().toISOString(),
+  });
+
+  for (const client of connectedClients) {
+    if (client.readyState === client.OPEN && client.isAuthenticated) {
+      client.send(payload);
+    }
+  }
+}
+
 // Rate limiting
 const rateLimitMap = new Map<string, number[]>();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
@@ -124,13 +147,96 @@ interface RunnerState {
   runner: ClaudeSdkRunner;
   workspaceId: string;
   conversationId: string;
+  createdAt: number;
 }
-const activeRunners = new Map<string, RunnerState>();
-const MAX_CONCURRENT_RUNNERS = 3;
+export const activeRunners = new Map<string, RunnerState>();
+export const MAX_CONCURRENT_RUNNERS = 3;
 
 function runnerKey(workspaceId: string, conversationId: string): string {
   return `${workspaceId}:${conversationId}`;
 }
+
+// Abort a runner for a specific conversation (used by REST abort endpoint)
+export function abortRunner(workspaceId: string, conversationId: string): boolean {
+  const key = runnerKey(workspaceId, conversationId);
+  const state = activeRunners.get(key);
+  if (!state) return false;
+  state.runner.abort();
+  activeRunners.delete(key);
+  return true;
+}
+
+/**
+ * Create a canUseTool handler that bridges the SDK's permission callback
+ * to our WebSocket-based tool approval UI.
+ *
+ * Flow: SDK calls canUseTool → broadcast WS event → user approves/rejects
+ * → toolApprovalStore resolves → result returned to SDK
+ */
+function createToolApprovalHandler(
+  workspaceId: string,
+  conversationId: string,
+  deviceId: string
+): NonNullable<ClaudeSdkOptions['canUseTool']> {
+  return async (toolName, input, toolUseId) => {
+    const toolInfo: ToolUseInfo = { id: toolUseId, name: toolName, input };
+    const display = formatToolForDisplay(toolInfo);
+
+    // Broadcast tool_approval_request to all authenticated clients
+    const payload = JSON.stringify({
+      type: 'tool_approval_request',
+      workspaceId,
+      conversationId,
+      toolId: toolUseId,
+      tool: {
+        name: toolName,
+        input,
+        description: display.description,
+        risk: display.risk,
+      },
+      timestamp: new Date().toISOString(),
+    });
+    for (const client of connectedClients) {
+      if (client.readyState === client.OPEN && client.isAuthenticated) {
+        client.send(payload);
+      }
+    }
+
+    // Wait for user approval (built-in 2min timeout + auto-approve for read-only tools)
+    try {
+      const result = await toolApprovalStore.requestApproval(toolInfo, conversationId, deviceId);
+      if (result.approved) {
+        return {
+          behavior: 'allow' as const,
+          updatedInput: result.modifiedInput as Record<string, unknown> | undefined,
+        };
+      }
+      return {
+        behavior: 'deny' as const,
+        message: result.reason || 'User rejected tool use',
+      };
+    } catch (error) {
+      // Timeout or cancellation
+      return {
+        behavior: 'deny' as const,
+        message: error instanceof Error ? error.message : 'Approval timed out',
+      };
+    }
+  };
+}
+
+// Periodic stale runner cleanup — abort runners that exceed 1.5x the timeout
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, state] of activeRunners) {
+    const age = now - state.createdAt;
+    if (age > config.RUNNER_TIMEOUT_MS * 1.5) {
+      console.warn(`Aborting stale runner ${key} (age: ${Math.round(age / 1000)}s)`);
+      state.runner.abort();
+      activeRunners.delete(key);
+    }
+  }
+}, 60000);
 
 export function handleChatWebSocket(ws: AuthenticatedSocket): void {
   // Track this client for broadcasting
@@ -470,7 +576,7 @@ async function handleChatMessage(
 
   // Track runner in activeRunners map
   const key = runnerKey(workspaceId, conversationId);
-  runners.set(key, { runner, workspaceId, conversationId });
+  runners.set(key, { runner, workspaceId, conversationId, createdAt: Date.now() });
 
   // Accumulate response for saving
   let fullText = '';
@@ -529,16 +635,36 @@ async function handleChatMessage(
     }
   });
 
-  // Run Claude SDK
+  // Build run options — conditionally wire tool approval
+  const runOptions: ClaudeSdkOptions = {
+    workspacePath: workspace.path,
+    systemPrompt: workspace.systemPrompt || undefined,
+    permissionMode: 'bypassPermissions',
+    maxTurns: 20,
+    resumeSessionId: conversation.sdk_session_id || undefined,
+    model: resolveModelId(data.model),
+  };
+
+  if (config.TOOL_APPROVAL_ENABLED) {
+    runOptions.canUseTool = createToolApprovalHandler(workspaceId, conversationId, ws.deviceId || '');
+    // permissionMode is overridden inside ClaudeSdkRunner when canUseTool is set
+  }
+
+  // Run Claude SDK with timeout
   try {
-    const response = await runner.run(prompt, {
-      workspacePath: workspace.path,
-      systemPrompt: workspace.systemPrompt || undefined,
-      permissionMode: 'bypassPermissions',
-      maxTurns: 20,
-      resumeSessionId: conversation.sdk_session_id || undefined,
-      model: data.model,
-    });
+    const response = await withTimeout(
+      runner.run(prompt, runOptions),
+      config.RUNNER_TIMEOUT_MS,
+      () => {
+        runner.abort();
+        send(ws, {
+          type: 'chat_error',
+          workspaceId,
+          conversationId,
+          error: `AI processing timed out after ${Math.round(config.RUNNER_TIMEOUT_MS / 60000)} minutes`,
+        });
+      }
+    );
 
     // Save assistant message
     saveMessage(
@@ -672,4 +798,215 @@ async function handleRetryMessage(
     conversationId: newConversationId,
     message: lastUserMessage.content,
   }, runners);
+}
+
+// Broadcast a message to all authenticated WebSocket clients
+function broadcastToAll(data: Record<string, unknown>): void {
+  const payload = JSON.stringify({
+    ...data,
+    timestamp: new Date().toISOString(),
+  });
+
+  for (const client of connectedClients) {
+    if (client.readyState === client.OPEN && client.isAuthenticated) {
+      client.send(payload);
+    }
+  }
+}
+
+/**
+ * Send feedback from diff review comments to AI for processing.
+ * Called from the REST endpoint; broadcasts events to all authenticated WS clients.
+ */
+export async function sendFeedbackToAI(params: {
+  workspaceId: string;
+  conversationId: string;
+  prompt: string;
+  originalReviewId: string;
+  model?: string;
+}): Promise<void> {
+  const { workspaceId, conversationId, prompt, originalReviewId, model } = params;
+  const db = getDb();
+
+  const workspace = getWorkspace(workspaceId);
+  if (!workspace) {
+    throw new Error('Workspace not found');
+  }
+
+  // Get conversation session ID
+  const conversation = db
+    .prepare('SELECT sdk_session_id FROM conversations WHERE id = ?')
+    .get(conversationId) as { sdk_session_id: string | null } | undefined;
+
+  const key = runnerKey(workspaceId, conversationId);
+
+  // Create runner
+  const runner = new ClaudeSdkRunner();
+  activeRunners.set(key, { runner, workspaceId, conversationId, createdAt: Date.now() });
+
+  // Broadcast feedback_processing event
+  broadcastToAll({
+    type: 'feedback_processing',
+    workspaceId,
+    conversationId,
+    originalReviewId,
+  });
+
+  // Save user message
+  saveMessage(conversationId, 'user', prompt);
+
+  // Accumulate response
+  let fullText = '';
+  const toolCalls: unknown[] = [];
+  const toolResults: unknown[] = [];
+
+  // Set up event handlers — broadcast to all clients
+  runner.on('event', (event: StreamEvent) => {
+    switch (event.type) {
+      case 'text':
+        fullText += event.content || '';
+        broadcastToAll({
+          type: 'chat_chunk',
+          workspaceId,
+          conversationId,
+          text: event.content,
+        });
+        break;
+
+      case 'tool_use':
+        toolCalls.push({
+          name: event.toolName,
+          input: event.toolInput,
+        });
+        broadcastToAll({
+          type: 'tool_use',
+          workspaceId,
+          conversationId,
+          tool: event.toolName,
+          input: event.toolInput,
+        });
+        break;
+
+      case 'tool_result':
+        toolResults.push(event.toolResult);
+        broadcastToAll({
+          type: 'tool_result',
+          workspaceId,
+          conversationId,
+          result: event.toolResult,
+        });
+        break;
+
+      case 'error':
+        broadcastToAll({
+          type: 'chat_error',
+          workspaceId,
+          conversationId,
+          error: event.content,
+        });
+        break;
+
+      case 'done':
+        break;
+    }
+  });
+
+  // Build run options — conditionally wire tool approval for feedback too
+  const feedbackRunOptions: ClaudeSdkOptions = {
+    workspacePath: workspace.path,
+    systemPrompt: workspace.systemPrompt || undefined,
+    permissionMode: 'bypassPermissions',
+    maxTurns: 20,
+    resumeSessionId: conversation?.sdk_session_id || undefined,
+    model: resolveModelId(model),
+  };
+
+  if (config.TOOL_APPROVAL_ENABLED) {
+    // For feedback, deviceId is not directly available — use empty string
+    // The approval store will still broadcast to all connected clients
+    feedbackRunOptions.canUseTool = createToolApprovalHandler(workspaceId, conversationId, '');
+  }
+
+  try {
+    const response = await withTimeout(
+      runner.run(prompt, feedbackRunOptions),
+      config.RUNNER_TIMEOUT_MS,
+      () => {
+        runner.abort();
+        broadcastToAll({
+          type: 'chat_error',
+          workspaceId,
+          conversationId,
+          error: `AI processing timed out after ${Math.round(config.RUNNER_TIMEOUT_MS / 60000)} minutes`,
+        });
+      }
+    );
+
+    // Save assistant message
+    saveMessage(
+      conversationId,
+      'assistant',
+      fullText || response.fullText,
+      toolCalls.length > 0 ? toolCalls : undefined,
+      toolResults.length > 0 ? toolResults : undefined
+    );
+
+    // Save session ID for future resume
+    if (response.sessionId && response.sessionId !== conversation?.sdk_session_id) {
+      db.prepare(
+        `UPDATE conversations SET sdk_session_id = ?, updated_at = datetime('now') WHERE id = ?`
+      ).run(response.sessionId, conversationId);
+    }
+
+    // Save token usage
+    if (response.tokenUsage) {
+      db.prepare(
+        `UPDATE conversations SET token_usage = ?, updated_at = datetime('now') WHERE id = ?`
+      ).run(JSON.stringify(response.tokenUsage), conversationId);
+    }
+
+    // If files were modified, create a new diff review
+    if (response.modifiedFiles.length > 0) {
+      try {
+        const newReview = await createDiffReview(workspaceId, workspace.path, conversationId);
+        broadcastToAll({
+          type: 'diff_ready',
+          workspaceId,
+          conversationId,
+          reviewId: newReview.id,
+          files: response.modifiedFiles,
+          isFeedbackResult: true,
+          originalReviewId,
+        });
+      } catch (diffError) {
+        // Diff creation may fail (e.g. no unstaged changes), still broadcast completion
+        console.error('Failed to create diff review after feedback:', diffError);
+        broadcastToAll({
+          type: 'feedback_complete',
+          workspaceId,
+          conversationId,
+          originalReviewId,
+          message: 'AI processed feedback but could not create a diff review.',
+        });
+      }
+    } else {
+      // No file changes
+      broadcastToAll({
+        type: 'feedback_complete',
+        workspaceId,
+        conversationId,
+        originalReviewId,
+        message: 'AI processed feedback but made no file changes.',
+      });
+    }
+  } catch (error) {
+    broadcastToAll({
+      type: 'chat_error',
+      workspaceId,
+      conversationId,
+      error: error instanceof Error ? error.message : 'Feedback processing failed',
+    });
+  } finally {
+    activeRunners.delete(key);
+  }
 }

@@ -6,7 +6,8 @@ import { KanbanColumn } from '../components/tasks/KanbanColumn';
 import { TaskCreateSheet } from '../components/tasks/TaskCreateSheet';
 import { useTaskStore } from '../stores/tasks';
 import { useWorkspaceStore } from '../stores/workspace';
-import type { Task, TaskPriority } from '../services/api';
+import type { Task, CreateTaskData } from '../services/api';
+import { useTaskWebSocket } from '../hooks/useTaskWebSocket';
 
 // Icons
 function ClockIcon() {
@@ -50,6 +51,7 @@ function PlusIcon() {
 }
 
 export function TasksPage() {
+  useTaskWebSocket();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const selectedWorkspaceId = useWorkspaceStore((s) => s.selectedWorkspaceId);
   const { getTaskState, loadTasks, createTask, runTask, cancelTask, deleteTask, isLoading, error, clearError } = useTaskStore();
@@ -70,10 +72,10 @@ export function TasksPage() {
   const completedTasks = taskList.filter((t: Task) => t.status === 'completed' || t.status === 'approved' || t.status === 'committed');
   const failedTasks = taskList.filter((t: Task) => t.status === 'failed' || t.status === 'cancelled');
 
-  const handleCreate = async (title: string, description: string, priority: TaskPriority) => {
+  const handleCreate = async (data: Omit<CreateTaskData, 'workspaceId'>) => {
     if (!workspaceId) return;
     try {
-      await createTask(workspaceId, title, description, priority);
+      await createTask({ ...data, workspaceId });
       setIsCreateOpen(false);
     } catch {
       // Error is in store
@@ -187,6 +189,7 @@ export function TasksPage() {
             onClose={() => setIsCreateOpen(false)}
             onSubmit={handleCreate}
             isLoading={isLoading}
+            availableTasks={taskList}
           />
         </>
       )}

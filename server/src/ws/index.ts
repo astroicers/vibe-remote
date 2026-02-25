@@ -1,6 +1,14 @@
 // WebSocket Module
 
-export { handleChatWebSocket, broadcastTaskStatus } from './chat-handler.js';
+export {
+  handleChatWebSocket,
+  broadcastTaskStatus,
+  broadcastTaskEvent,
+  sendFeedbackToAI,
+  activeRunners,
+  MAX_CONCURRENT_RUNNERS,
+  abortRunner,
+} from './chat-handler.js';
 export { RateLimitStore, rateLimitStore, DEFAULT_RATE_LIMIT_CONFIG } from './rate-limit.js';
 export {
   ToolApprovalStore,

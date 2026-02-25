@@ -1,3 +1,29 @@
+# AI-SOP-Protocol (ASP) — 行為憲法
+
+> 本專案遵循 ASP 協議。讀取順序：本區塊 → `.ai_profile` → 對應 profiles（按需）
+> 鐵則與 Profile 對應表請見：`.asp/profiles/global_core.md`
+
+### ASP 工作流規則
+
+1. **所有程式碼變更（含 bug fix、既有功能啟用、refactor）都必須先建立 SPEC**
+   - 模板：`.asp/templates/SPEC_Template.md`
+   - 存放：`docs/specs/SPEC-{NNN}-{slug}.md`
+   - 若涉及技術決策（多方案擇一），同時建立 ADR（`docs/adr/ADR-{NNN}-{slug}.md`）
+
+2. **例外情境**（不需 SPEC）：
+   - 純文件修改（docs, README, ROADMAP）
+   - 單行配置修改（`.env`, `docker-compose.yml`）
+   - CLAUDE.md / `.ai_profile` 本身的更新
+
+3. **緊急修復（hotfix）流程**：
+   - 可先實作，但**必須在同一 session 內追溯建立 SPEC**
+   - 追溯 SPEC 需標註 `> 追溯規格書——修復已於 commit {hash} 完成。`
+
+4. **ROADMAP 追蹤**：
+   - 每個 SPEC 實作完成後，更新 `docs/ROADMAP.md` 對應條目
+
+---
+
 # CLAUDE.md — Vibe Remote 開發指引
 
 ## 專案概述

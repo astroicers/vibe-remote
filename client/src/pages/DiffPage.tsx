@@ -5,7 +5,8 @@ import { AppLayout } from '../components/AppLayout';
 import { BottomSheet } from '../components/BottomSheet';
 import { useDiffStore } from '../stores/diff';
 import { useWorkspaceStore } from '../stores/workspace';
-import { useChatStore } from '../stores/chat';
+import { useToastStore } from '../stores/toast';
+import { ws } from '../services/websocket';
 
 export function DiffPage() {
   const navigate = useNavigate();
@@ -28,13 +29,13 @@ export function DiffPage() {
     rejectFile,
     addComment,
     selectFile,
+    sendFeedback,
+    onFeedbackDiffReady,
     clearError,
   } = useDiffStore();
 
   const wsDiff = getDiffState(wsId);
-  const { currentDiff, currentReview, selectedFile } = wsDiff;
-
-  const { createConversation, sendMessage } = useChatStore();
+  const { currentDiff, currentReview, selectedFile, feedbackProcessing } = wsDiff;
 
   const [showFileSheet, setShowFileSheet] = useState(false);
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
@@ -66,6 +67,33 @@ export function DiffPage() {
       selectFile(wsId, files[0]);
     }
   }, [wsId, files, selectedFile, selectFile]);
+
+  // Listen for feedback-related WS events
+  useEffect(() => {
+    if (!wsId) return;
+
+    const unsubDiffReady = ws.on('diff_ready', (data) => {
+      if (data.isFeedbackResult && data.workspaceId === wsId) {
+        onFeedbackDiffReady(wsId, data.reviewId as string);
+        navigate(`/diff?review=${data.reviewId}`, { replace: true });
+      }
+    });
+
+    const unsubComplete = ws.on('feedback_complete', (data) => {
+      if (data.workspaceId === wsId) {
+        useToastStore.getState().addToast(
+          (data.message as string) || 'AI processed feedback but made no changes',
+          'info'
+        );
+        onFeedbackDiffReady(wsId, '');
+      }
+    });
+
+    return () => {
+      unsubDiffReady();
+      unsubComplete();
+    };
+  }, [wsId, navigate, onFeedbackDiffReady]);
 
   // Current file index for prev/next navigation
   const currentIndex = selectedFile
@@ -114,20 +142,13 @@ export function DiffPage() {
 
   const handleSendFeedbackToAI = async () => {
     if (!wsId) return;
-    const review = currentReview;
-    if (!review) return;
-    const userComments = review.comments.filter((c) => c.author === 'user');
-    const formatted = userComments
-      .map((c) => {
-        const linePart = c.lineNumber ? `, line ${c.lineNumber}` : '';
-        return `- ${c.content} (file: ${c.filePath}${linePart})`;
-      })
-      .join('\n');
-    const message = `Please address the following review feedback and make the requested changes:\n\n${formatted}`;
-    await createConversation(wsId);
-    sendMessage(wsId, message);
+    try {
+      await sendFeedback(wsId);
+      // feedbackProcessing state will show loading indicator
+    } catch {
+      // Error handled by store
+    }
     setShowFeedbackPrompt(false);
-    navigate('/chat');
   };
 
   const handleCreateReview = async () => {
@@ -271,7 +292,7 @@ export function DiffPage() {
                   </button>
 
                   {/* Per-file actions */}
-                  {currentReview && currentReview.status === 'pending' && (
+                  {currentReview && currentReview.status === 'pending' && !feedbackProcessing && (
                     <>
                       <div className="w-px h-6 bg-border" />
                       <button
@@ -328,7 +349,15 @@ export function DiffPage() {
       {/* Bottom actions */}
       {!isLoading && files.length > 0 && (
         <div className="px-4 py-3 border-t border-border bg-bg-secondary flex-shrink-0">
-          {currentReview ? (
+          {feedbackProcessing ? (
+            <div className="flex items-center justify-center gap-3 py-3">
+              <svg className="animate-spin h-5 w-5 text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span className="text-sm text-text-secondary">AI is processing your feedback...</span>
+            </div>
+          ) : currentReview ? (
             <ReviewActions
               status={currentReview.status}
               onApproveAll={() => wsId && approveAll(wsId)}

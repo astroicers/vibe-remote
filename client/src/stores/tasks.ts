@@ -1,16 +1,28 @@
 // Tasks Store — Per-workspace partitioned task state
 
 import { create } from 'zustand';
-import { tasks, type Task, type TaskPriority } from '../services/api';
+import { tasks, type Task, type TaskPriority, type CreateTaskData } from '../services/api';
 import { useToastStore } from './toast';
+
+const MAX_PROGRESS_CHUNKS = 50;
+
+export interface TaskProgress {
+  taskId: string;
+  chunks: string[];
+  currentText: string;
+  lastToolUse: { tool: string; input: unknown } | null;
+  lastToolResult: { tool: string; result: unknown } | null;
+}
 
 interface WorkspaceTaskState {
   tasks: Task[];
+  activeTaskProgress: Record<string, TaskProgress>;
 }
 
 function createDefaultWorkspaceTaskState(): WorkspaceTaskState {
   return {
     tasks: [],
+    activeTaskProgress: {},
   };
 }
 
@@ -21,12 +33,16 @@ interface TaskState {
 
   getTaskState: (workspaceId: string) => WorkspaceTaskState;
   loadTasks: (workspaceId: string) => Promise<void>;
-  createTask: (workspaceId: string, title: string, description: string, priority?: TaskPriority, contextFiles?: string[]) => Promise<Task>;
+  createTask: (data: CreateTaskData) => Promise<Task>;
   updateTask: (workspaceId: string, taskId: string, updates: Partial<{ title: string; description: string; priority: TaskPriority }>) => Promise<void>;
   deleteTask: (workspaceId: string, taskId: string) => Promise<void>;
   runTask: (workspaceId: string, taskId: string) => Promise<void>;
   cancelTask: (workspaceId: string, taskId: string) => Promise<void>;
   handleTaskStatusUpdate: (task: Task) => void;
+  handleTaskProgress: (taskId: string, workspaceId: string, text: string) => void;
+  handleTaskToolUse: (taskId: string, workspaceId: string, tool: string, input: unknown) => void;
+  handleTaskToolResult: (taskId: string, workspaceId: string, tool: string, result: unknown) => void;
+  handleTaskComplete: (taskId: string, workspaceId: string, status: string, result?: string, error?: string, _modifiedFiles?: string[]) => void;
   clearError: () => void;
 }
 
@@ -68,10 +84,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   },
 
-  createTask: async (workspaceId: string, title: string, description: string, priority?: TaskPriority, contextFiles?: string[]) => {
+  createTask: async (data: CreateTaskData) => {
     set({ isLoading: true, error: null });
     try {
-      const task = await tasks.create({ workspaceId, title, description, priority, contextFiles });
+      const task = await tasks.create(data);
+      const workspaceId = data.workspaceId;
       set((state) => ({
         ...updateWorkspaceTasks(state, workspaceId, (ws) => ({
           tasks: [task, ...ws.tasks],
@@ -170,6 +187,113 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           tasks: exists
             ? ws.tasks.map((t) => (t.id === task.id ? task : t))
             : [task, ...ws.tasks],
+        })),
+      };
+    });
+  },
+
+  handleTaskProgress: (taskId: string, workspaceId: string, text: string) => {
+    set((state) => {
+      const wsState = state.tasksByWorkspace[workspaceId] || createDefaultWorkspaceTaskState();
+      const existing = wsState.activeTaskProgress[taskId] || {
+        taskId,
+        chunks: [],
+        currentText: '',
+        lastToolUse: null,
+        lastToolResult: null,
+      };
+
+      const newChunks = [...existing.chunks, text];
+      // Keep max MAX_PROGRESS_CHUNKS chunks
+      const trimmedChunks = newChunks.length > MAX_PROGRESS_CHUNKS
+        ? newChunks.slice(newChunks.length - MAX_PROGRESS_CHUNKS)
+        : newChunks;
+
+      return {
+        ...updateWorkspaceTasks(state, workspaceId, () => ({
+          activeTaskProgress: {
+            ...wsState.activeTaskProgress,
+            [taskId]: {
+              ...existing,
+              chunks: trimmedChunks,
+              currentText: existing.currentText + text,
+            },
+          },
+        })),
+      };
+    });
+  },
+
+  handleTaskToolUse: (taskId: string, workspaceId: string, tool: string, input: unknown) => {
+    set((state) => {
+      const wsState = state.tasksByWorkspace[workspaceId] || createDefaultWorkspaceTaskState();
+      const existing = wsState.activeTaskProgress[taskId] || {
+        taskId,
+        chunks: [],
+        currentText: '',
+        lastToolUse: null,
+        lastToolResult: null,
+      };
+
+      return {
+        ...updateWorkspaceTasks(state, workspaceId, () => ({
+          activeTaskProgress: {
+            ...wsState.activeTaskProgress,
+            [taskId]: {
+              ...existing,
+              lastToolUse: { tool, input },
+            },
+          },
+        })),
+      };
+    });
+  },
+
+  handleTaskToolResult: (taskId: string, workspaceId: string, tool: string, result: unknown) => {
+    set((state) => {
+      const wsState = state.tasksByWorkspace[workspaceId] || createDefaultWorkspaceTaskState();
+      const existing = wsState.activeTaskProgress[taskId] || {
+        taskId,
+        chunks: [],
+        currentText: '',
+        lastToolUse: null,
+        lastToolResult: null,
+      };
+
+      return {
+        ...updateWorkspaceTasks(state, workspaceId, () => ({
+          activeTaskProgress: {
+            ...wsState.activeTaskProgress,
+            [taskId]: {
+              ...existing,
+              lastToolResult: { tool, result },
+            },
+          },
+        })),
+      };
+    });
+  },
+
+  handleTaskComplete: (taskId: string, workspaceId: string, status: string, result?: string, error?: string, _modifiedFiles?: string[]) => {
+    set((state) => {
+      const wsState = state.tasksByWorkspace[workspaceId] || createDefaultWorkspaceTaskState();
+      const { [taskId]: _removed, ...remaining } = wsState.activeTaskProgress;
+
+      // Update the matching task in the tasks array with status/result/error
+      const updatedTasks = wsState.tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        return {
+          ...t,
+          status: status as Task['status'],
+          result: result ?? t.result,
+          error: error ?? t.error,
+        };
+      });
+
+      return {
+        ...updateWorkspaceTasks(state, workspaceId, () => ({
+          tasks: updatedTasks,
+          activeTaskProgress: remaining,
         })),
       };
     });

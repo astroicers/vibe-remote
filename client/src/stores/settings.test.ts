@@ -32,6 +32,16 @@ describe('useSettingsStore', () => {
     expect(useSettingsStore.getState().model).toBe('sonnet');
   });
 
+  it('setModel supports haiku', () => {
+    useSettingsStore.getState().setModel('haiku');
+    expect(useSettingsStore.getState().model).toBe('haiku');
+  });
+
+  it('setModel accepts any string model key', () => {
+    useSettingsStore.getState().setModel('custom-model');
+    expect(useSettingsStore.getState().model).toBe('custom-model');
+  });
+
   it('setVoiceEnabled updates voiceEnabled', () => {
     useSettingsStore.getState().setVoiceEnabled(false);
     expect(useSettingsStore.getState().voiceEnabled).toBe(false);

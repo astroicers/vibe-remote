@@ -236,6 +236,11 @@ export const chat = {
     request<{ success: boolean }>(`/chat/conversations/${id}`, {
       method: 'DELETE',
     }),
+
+  abortConversation: (id: string) =>
+    request<{ success: boolean; message: string }>(`/chat/conversations/${id}/abort`, {
+      method: 'POST',
+    }),
 };
 
 // Diff API
@@ -326,6 +331,12 @@ export const diff = {
       method: 'POST',
       json: { filePath, content, lineNumber },
     }),
+
+  sendFeedback: (id: string, filePathFilter?: string[]) =>
+    request<{ status: string; conversationId: string; message: string }>(
+      `/diff/reviews/${id}/feedback`,
+      { method: 'POST', json: { filePathFilter } }
+    ),
 };
 
 // Notifications API
@@ -382,6 +393,7 @@ export const templates = {
 // Tasks API
 export type TaskStatus = 'pending' | 'queued' | 'running' | 'awaiting_review' | 'approved' | 'committed' | 'completed' | 'failed' | 'cancelled';
 export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent';
+export type DependencyStatus = 'ready' | 'waiting' | 'blocked';
 
 export interface Task {
   id: string;
@@ -393,6 +405,7 @@ export interface Task {
   progress: number | null;
   branch: string | null;
   depends_on: string | null;
+  dependency_status: DependencyStatus;
   context_files: string | null;
   result: string | null;
   error: string | null;
@@ -402,6 +415,17 @@ export interface Task {
   updated_at: string;
 }
 
+export interface CreateTaskData {
+  workspaceId: string;
+  title: string;
+  description: string;
+  priority?: TaskPriority;
+  contextFiles?: string[];
+  branch?: string;
+  autoBranch?: boolean;
+  dependsOn?: string[];
+}
+
 export const tasks = {
   list: (workspaceId: string) =>
     request<Task[]>(`/tasks?workspaceId=${workspaceId}`),
@@ -409,7 +433,7 @@ export const tasks = {
   get: (id: string) =>
     request<Task>(`/tasks/${id}`),
 
-  create: (data: { workspaceId: string; title: string; description: string; priority?: TaskPriority; contextFiles?: string[] }) =>
+  create: (data: CreateTaskData) =>
     request<Task>('/tasks', { method: 'POST', json: data }),
 
   update: (id: string, data: Partial<{ title: string; description: string; priority: TaskPriority; status: TaskStatus }>) =>
@@ -423,6 +447,37 @@ export const tasks = {
 
   cancel: (id: string) =>
     request<Task>(`/tasks/${id}/cancel`, { method: 'POST' }),
+
+  getDependents: (id: string) =>
+    request<Task[]>(`/tasks/${id}/dependents`),
 };
 
 export { ApiError };
+
+// Models API
+export interface ModelInfo {
+  key: string;
+  name: string;
+  description: string;
+  modelId: string;
+}
+
+export interface ModelsResponse {
+  models: ModelInfo[];
+  default: string;
+}
+
+export const models = {
+  list: () => request<ModelsResponse>('/models'),
+};
+
+// Settings API
+export const settings = {
+  get: () => request<{ settings: Record<string, string> }>('/settings'),
+  update: (settingsData: Record<string, string>) =>
+    request<{ settings: Record<string, string> }>('/settings', { method: 'PUT', json: { settings: settingsData } }),
+  updateOne: (key: string, value: string) =>
+    request<{ key: string; value: string; updated_at: string }>(`/settings/${encodeURIComponent(key)}`, { method: 'PATCH', json: { value } }),
+  remove: (key: string) =>
+    request<{ success: boolean }>(`/settings/${encodeURIComponent(key)}`, { method: 'DELETE' }),
+};

@@ -45,6 +45,14 @@ coverage/
 # PWA
 dev-dist/
 
+# ASP (AI-SOP-Protocol)
+CLAUDE.md.pre-asp
+.rag/index/
+.guardrail/
+.agent-events/
+.agent-lock.yaml
+docs/session-log.md
+
 # Misc
 *.pem
 *.key

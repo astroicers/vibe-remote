@@ -3,7 +3,17 @@
 import { TaskManager, type Task } from './manager.js';
 import { getDb } from '../db/index.js';
 
-type TaskRunnerFn = (task: Task) => Promise<{ result?: string; error?: string }>;
+type TaskEventPayload = {
+  type: string;
+  taskId: string;
+  workspaceId: string;
+  [key: string]: unknown;
+};
+
+type TaskRunnerFn = (
+  task: Task,
+  onEvent?: (event: TaskEventPayload) => void
+) => Promise<{ result?: string; error?: string }>;
 
 export class TaskQueue {
   private manager: TaskManager;
@@ -11,6 +21,7 @@ export class TaskQueue {
   private isProcessing = false;
   private currentTaskId: string | null = null;
   private onStatusChange: ((task: Task) => void) | null = null;
+  private onTaskEvent: ((event: TaskEventPayload) => void) | null = null;
 
   constructor(manager: TaskManager) {
     this.manager = manager;
@@ -22,6 +33,10 @@ export class TaskQueue {
 
   onTaskStatusChange(callback: (task: Task) => void): void {
     this.onStatusChange = callback;
+  }
+
+  onTaskEventCallback(callback: (event: TaskEventPayload) => void): void {
+    this.onTaskEvent = callback;
   }
 
   async enqueue(_taskId: string): Promise<void> {
@@ -56,9 +71,9 @@ export class TaskQueue {
   private async processNext(): Promise<void> {
     if (this.isProcessing || !this.runner) return;
 
-    // Find next pending task (highest priority first)
+    // Find next pending task whose dependencies are all met
     const db = getDb();
-    const next = db.prepare(
+    const pendingTasks = db.prepare(
       `SELECT * FROM tasks WHERE status = 'pending'
        ORDER BY
          CASE priority
@@ -67,9 +82,12 @@ export class TaskQueue {
            WHEN 'normal' THEN 2
            WHEN 'low' THEN 3
          END ASC,
-         created_at ASC
-       LIMIT 1`
-    ).get() as Task | undefined;
+         created_at ASC`
+    ).all() as Task[];
+
+    const next = pendingTasks.find(task =>
+      this.manager.getDependencyStatus(task) === 'ready'
+    );
 
     if (!next) return;
 
@@ -81,7 +99,7 @@ export class TaskQueue {
     if (running) this.onStatusChange?.(running);
 
     try {
-      const result = await this.runner(next);
+      const result = await this.runner(next, this.onTaskEvent ?? undefined);
 
       // Check if cancelled during execution
       const current = this.manager.getTask(next.id);
@@ -108,6 +126,7 @@ export class TaskQueue {
     } finally {
       this.isProcessing = false;
       this.currentTaskId = null;
+      // Process next — also picks up downstream tasks whose dependencies just completed
       this.processNext();
     }
   }

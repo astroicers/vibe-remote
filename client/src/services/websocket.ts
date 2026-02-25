@@ -196,3 +196,48 @@ export interface TaskStatusEvent {
   task: Record<string, unknown>;
   timestamp: string;
 }
+
+// Task execution streaming event types
+export interface TaskProgressEvent {
+  type: 'task_progress';
+  taskId: string;
+  workspaceId: string;
+  text: string;
+  timestamp: string;
+}
+
+export interface TaskToolUseEvent {
+  type: 'task_tool_use';
+  taskId: string;
+  workspaceId: string;
+  tool: string;
+  input: Record<string, unknown>;
+  timestamp: string;
+}
+
+export interface TaskToolResultEvent {
+  type: 'task_tool_result';
+  taskId: string;
+  workspaceId: string;
+  tool: string;
+  result: unknown;
+  timestamp: string;
+}
+
+export interface TaskCompleteEvent {
+  type: 'task_complete';
+  taskId: string;
+  workspaceId: string;
+  status: 'completed' | 'failed';
+  result?: string;
+  error?: string;
+  modifiedFiles: string[];
+  tokenUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheCreationTokens: number;
+    costUsd: number;
+  };
+  timestamp: string;
+}

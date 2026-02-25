@@ -218,3 +218,33 @@ export async function discardChanges(workspacePath: string, files: string[]): Pr
   const git = getGit(workspacePath);
   await git.checkout(['--', ...files]);
 }
+
+export async function getCurrentBranch(workspacePath: string): Promise<string> {
+  const git = getGit(workspacePath);
+  const result = await git.revparse(['--abbrev-ref', 'HEAD']);
+  return result.trim();
+}
+
+export async function branchExists(workspacePath: string, branchName: string): Promise<boolean> {
+  const git = getGit(workspacePath);
+  const summary = await git.branchLocal();
+  return summary.all.includes(branchName);
+}
+
+export async function createAndCheckoutBranch(workspacePath: string, branchName: string): Promise<void> {
+  const git = getGit(workspacePath);
+  await git.checkoutLocalBranch(branchName);
+}
+
+export async function stashChanges(workspacePath: string): Promise<boolean> {
+  const git = getGit(workspacePath);
+  const status = await git.status();
+  if (status.isClean()) return false;
+  await git.stash(['push', '-u', '-m', `vibe-remote-auto-stash-${Date.now()}`]);
+  return true;
+}
+
+export async function popStash(workspacePath: string): Promise<void> {
+  const git = getGit(workspacePath);
+  await git.stash(['pop']);
+}

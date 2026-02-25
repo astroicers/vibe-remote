@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { authMiddleware } from '../auth/middleware.js';
 import { getWorkspace } from '../workspace/index.js';
 import { getDb, generateId } from '../db/index.js';
+import { abortRunner } from '../ws/index.js';
 import type { AIMessage } from '../ai/types.js';
 
 const router = Router();
@@ -195,6 +196,29 @@ router.delete('/conversations/:id', (req, res) => {
   }
 
   res.json({ success: true });
+});
+
+// Abort a running conversation
+router.post('/conversations/:id/abort', (req, res) => {
+  const conversationId = req.params.id;
+  const db = getDb();
+
+  const conversation = db
+    .prepare('SELECT workspace_id FROM conversations WHERE id = ?')
+    .get(conversationId) as { workspace_id: string } | undefined;
+
+  if (!conversation) {
+    res.status(404).json({ error: 'Conversation not found', code: 'NOT_FOUND' });
+    return;
+  }
+
+  const aborted = abortRunner(conversation.workspace_id, conversationId);
+  if (!aborted) {
+    res.status(404).json({ error: 'No active runner for this conversation', code: 'RUNNER_NOT_FOUND' });
+    return;
+  }
+
+  res.json({ success: true, message: 'Runner aborted' });
 });
 
 // Get conversation history as AIMessage array (for AI context)

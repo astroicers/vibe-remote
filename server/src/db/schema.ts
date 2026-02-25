@@ -106,6 +106,15 @@ CREATE TABLE IF NOT EXISTS prompt_templates (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+
+-- Device settings (per-device key-value preferences)
+CREATE TABLE IF NOT EXISTS device_settings (
+  device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (device_id, key)
+);
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_conversations_workspace ON conversations(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
@@ -113,6 +122,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_diff_reviews_workspace ON diff_reviews(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_prompt_templates_workspace ON prompt_templates(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_device_settings_device ON device_settings(device_id);
 `;
 
 export const SEED_DATA = `

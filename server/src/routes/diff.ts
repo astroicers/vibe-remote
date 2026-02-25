@@ -17,7 +17,14 @@ import {
   filterIgnoredFiles,
   parseDiff,
   generateUnifiedView,
+  buildFeedbackPrompt,
 } from '../diff/index.js';
+import { getDb, generateId } from '../db/index.js';
+import {
+  sendFeedbackToAI,
+  activeRunners,
+  MAX_CONCURRENT_RUNNERS,
+} from '../ws/index.js';
 
 const router = Router();
 
@@ -316,6 +323,114 @@ router.post('/reviews/:id/actions', async (req, res) => {
       code: 'GIT_ERROR',
     });
   }
+});
+
+// Send feedback to AI for a diff review
+const feedbackSchema = z.object({
+  filePathFilter: z.array(z.string()).optional(),
+});
+
+router.post('/reviews/:id/feedback', async (req, res) => {
+  // 1. Validate review exists
+  const review = getDiffReview(req.params.id);
+  if (!review) {
+    res.status(404).json({
+      error: 'Diff review not found',
+      code: 'NOT_FOUND',
+    });
+    return;
+  }
+
+  const parsed = feedbackSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Invalid request',
+      code: 'VALIDATION_ERROR',
+    });
+    return;
+  }
+
+  const { filePathFilter } = parsed.data;
+
+  // 2. Get user comments (optionally filtered by file path)
+  let userComments = review.comments.filter((c) => c.author === 'user');
+  if (filePathFilter && filePathFilter.length > 0) {
+    userComments = userComments.filter((c) => filePathFilter.includes(c.filePath));
+  }
+
+  // 3. Validate at least 1 user comment
+  if (userComments.length === 0) {
+    res.status(400).json({
+      error: 'No user comments to send as feedback',
+      code: 'NO_COMMENTS',
+    });
+    return;
+  }
+
+  // 4. Get workspace
+  const workspace = getWorkspace(review.workspaceId);
+  if (!workspace) {
+    res.status(404).json({
+      error: 'Workspace not found',
+      code: 'WORKSPACE_NOT_FOUND',
+    });
+    return;
+  }
+
+  // 5. Get or create conversation
+  const db = getDb();
+  let conversationId = review.conversationId;
+
+  if (!conversationId) {
+    // Create a new conversation
+    conversationId = generateId('conv');
+    db.prepare(
+      `INSERT INTO conversations (id, workspace_id, title) VALUES (?, ?, ?)`
+    ).run(conversationId, review.workspaceId, 'Feedback Review');
+
+    // Update the review to link to this conversation
+    db.prepare(
+      `UPDATE diff_reviews SET conversation_id = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(conversationId, review.id);
+  }
+
+  // 6. Check runner concurrency limits
+  const runnerKey = `${review.workspaceId}:${conversationId}`;
+  if (activeRunners.has(runnerKey)) {
+    res.status(409).json({
+      error: 'Conversation is already processing',
+      code: 'RUNNER_BUSY',
+    });
+    return;
+  }
+
+  if (activeRunners.size >= MAX_CONCURRENT_RUNNERS) {
+    res.status(429).json({
+      error: 'Too many concurrent sessions',
+      code: 'RATE_LIMIT',
+    });
+    return;
+  }
+
+  // 7. Build feedback prompt
+  const prompt = buildFeedbackPrompt(review, review.comments, filePathFilter);
+
+  // 8. Return 202 Accepted immediately
+  res.status(202).json({
+    status: 'processing',
+    conversationId,
+    message: 'Feedback sent to AI. A new diff review will be created when processing completes.',
+  });
+
+  // 9. Start background AI processing (do NOT await)
+  sendFeedbackToAI({
+    workspaceId: review.workspaceId,
+    conversationId,
+    prompt,
+    originalReviewId: review.id,
+  }).catch((error) => {
+    console.error('Feedback AI processing error:', error);
+  });
 });
 
 // Add a comment to a diff review

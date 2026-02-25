@@ -3,9 +3,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../auth/middleware.js';
-import { TaskManager, TaskQueue, type Task } from '../tasks/index.js';
+import { TaskManager, TaskQueue, ValidationError, type Task } from '../tasks/index.js';
 import { runTask } from '../tasks/runner.js';
-import { broadcastTaskStatus } from '../ws/index.js';
+import { broadcastTaskStatus, broadcastTaskEvent } from '../ws/index.js';
 
 const router = Router();
 
@@ -22,6 +22,11 @@ taskQueue.setRunner(runTask);
 // Broadcast task status changes via WebSocket
 taskQueue.onTaskStatusChange((task: Task) => {
   broadcastTaskStatus(task as unknown as Record<string, unknown>);
+});
+
+// Broadcast task execution events (progress, tool use, completion) via WebSocket
+taskQueue.onTaskEventCallback((event) => {
+  broadcastTaskEvent(event);
 });
 
 // List tasks (requires workspaceId query param)
@@ -41,7 +46,7 @@ router.get('/', (req, res) => {
 
 // Get single task
 router.get('/:id', (req, res) => {
-  const task = taskManager.getTask(req.params.id);
+  const task = taskManager.getTaskWithDeps(req.params.id);
   if (!task) {
     res.status(404).json({
       error: 'Task not found',
@@ -52,6 +57,21 @@ router.get('/:id', (req, res) => {
   res.json(task);
 });
 
+// Get dependents of a task
+router.get('/:id/dependents', (req, res) => {
+  const task = taskManager.getTask(req.params.id);
+  if (!task) {
+    res.status(404).json({
+      error: 'Task not found',
+      code: 'NOT_FOUND',
+    });
+    return;
+  }
+
+  const dependents = taskManager.getDependents(req.params.id);
+  res.json(dependents);
+});
+
 // Create task
 const createTaskSchema = z.object({
   workspaceId: z.string().min(1, 'workspaceId is required'),
@@ -59,6 +79,9 @@ const createTaskSchema = z.object({
   description: z.string().min(1, 'Description is required'),
   priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
   contextFiles: z.array(z.string()).optional(),
+  branch: z.string().min(1).max(100).optional(),
+  autoBranch: z.boolean().optional(),
+  dependsOn: z.array(z.string()).max(10).optional(),
 });
 
 router.post('/', (req, res) => {
@@ -73,8 +96,20 @@ router.post('/', (req, res) => {
     return;
   }
 
-  const task = taskManager.createTask(parsed.data);
-  res.status(201).json(task);
+  try {
+    const task = taskManager.createTask(parsed.data);
+    res.status(201).json(task);
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      const status = error.code === 'BRANCH_EXISTS' ? 409 : 400;
+      res.status(status).json({
+        error: error.message,
+        code: error.code,
+      });
+      return;
+    }
+    throw error;
+  }
 });
 
 // Update task
@@ -145,16 +180,27 @@ router.delete('/:id', (req, res) => {
     return;
   }
 
-  const deleted = taskManager.deleteTask(req.params.id);
-  if (!deleted) {
-    res.status(404).json({
-      error: 'Task not found',
-      code: 'NOT_FOUND',
-    });
-    return;
-  }
+  try {
+    const deleted = taskManager.deleteTask(req.params.id);
+    if (!deleted) {
+      res.status(404).json({
+        error: 'Task not found',
+        code: 'NOT_FOUND',
+      });
+      return;
+    }
 
-  res.json({ success: true });
+    res.json({ success: true });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      res.status(400).json({
+        error: error.message,
+        code: error.code,
+      });
+      return;
+    }
+    throw error;
+  }
 });
 
 // Run task (enqueue for execution)

@@ -1,0 +1,10 @@
+type: system
+mode: single
+workflow: standard
+rag: disabled
+guardrail: disabled
+hitl: standard
+name: vibe-remote
+spec_required: all_code_changes
+spec_exceptions: docs_only, single_line_config, claude_md_update
+hotfix_policy: implement_first_then_retroactive_spec_same_session

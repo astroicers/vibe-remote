@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Task } from './manager.js';
 
+// Mock config for models module
+vi.mock('../config.js', () => ({
+  config: {
+    CLAUDE_MODEL: 'claude-sonnet-4-20250514',
+  },
+}));
+
 // Mock ClaudeSdkRunner
 const mockRun = vi.fn();
 
@@ -78,6 +85,7 @@ describe('runTask', () => {
       systemPrompt: undefined,
       permissionMode: 'bypassPermissions',
       maxTurns: 30,
+      model: 'claude-sonnet-4-20250514',
     });
   });
 
@@ -104,6 +112,7 @@ describe('runTask', () => {
       systemPrompt: 'You are a helpful assistant',
       permissionMode: 'bypassPermissions',
       maxTurns: 30,
+      model: 'claude-sonnet-4-20250514',
     });
   });
 

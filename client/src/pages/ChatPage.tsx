@@ -7,6 +7,8 @@ import { ConversationSelector } from '../components/ConversationSelector';
 import { useChatStore } from '../stores/chat';
 import { useAuthStore } from '../stores/auth';
 import { useWorkspaceStore } from '../stores/workspace';
+import { useToastStore } from '../stores/toast';
+import { chat as chatApi } from '../services/api';
 
 export function ChatPage() {
   const navigate = useNavigate();
@@ -215,6 +217,26 @@ export function ChatPage() {
             </svg>
           </p>
         </button>
+
+        {/* Abort button — visible when AI is processing */}
+        {(isStreaming || isSending) && currentConversationId && (
+          <button
+            onClick={async () => {
+              try {
+                await chatApi.abortConversation(currentConversationId);
+                useToastStore.getState().addToast('AI processing aborted', 'info');
+              } catch {
+                useToastStore.getState().addToast('Failed to abort', 'error');
+              }
+            }}
+            className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-danger/20 text-danger"
+            title="Abort"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+              <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+            </svg>
+          </button>
+        )}
 
         {/* New conversation */}
         <button

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ChatPage } from './pages/ChatPage';
 import { DiffPage } from './pages/DiffPage';
@@ -5,8 +6,18 @@ import { TasksPage } from './pages/TasksPage';
 import { ReposPage } from './pages/ReposPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ToastContainer } from './components/Toast';
+import { useAuthStore } from './stores/auth';
+import { useSettingsStore } from './stores/settings';
 
 export default function App() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      useSettingsStore.getState().loadFromServer();
+    }
+  }, [isAuthenticated]);
+
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
       <Routes>

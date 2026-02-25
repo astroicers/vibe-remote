@@ -1,6 +1,6 @@
-// TaskCard — Displays a single task with status badge, priority, and action buttons
+// TaskCard — Displays a single task with status badge, priority, branch, dependency status, and action buttons
 
-import type { Task, TaskStatus, TaskPriority } from '../../services/api';
+import type { Task, TaskStatus, TaskPriority, DependencyStatus } from '../../services/api';
 
 interface TaskCardProps {
   task: Task;
@@ -28,6 +28,12 @@ const priorityConfig: Record<TaskPriority, { label: string; color: string }> = {
   low: { label: 'Low', color: 'text-text-muted' },
 };
 
+const depStatusConfig: Record<DependencyStatus, { label: string; color: string; bgColor: string }> = {
+  ready: { label: 'Ready', color: 'text-success', bgColor: 'bg-success/15' },
+  waiting: { label: 'Waiting', color: 'text-warning', bgColor: 'bg-warning/15' },
+  blocked: { label: 'Blocked', color: 'text-danger', bgColor: 'bg-danger/15' },
+};
+
 function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
@@ -47,10 +53,15 @@ export function TaskCard({ task, onRun, onCancel, onDelete }: TaskCardProps) {
   const status = statusConfig[task.status] || statusConfig.pending;
   const priority = priorityConfig[task.priority] || priorityConfig.normal;
 
-  const canRun = task.status === 'pending';
+  const canRun = task.status === 'pending' && task.dependency_status === 'ready';
   const canCancel = task.status === 'pending' || task.status === 'running';
   const canDelete = task.status !== 'running';
   const isRunning = task.status === 'running';
+
+  const hasDeps = task.depends_on !== null;
+  const depStatus = task.dependency_status && task.dependency_status !== 'ready' && hasDeps
+    ? depStatusConfig[task.dependency_status]
+    : null;
 
   return (
     <div className="bg-bg-surface border border-border rounded-lg p-3 space-y-2">
@@ -72,6 +83,23 @@ export function TaskCard({ task, onRun, onCancel, onDelete }: TaskCardProps) {
       {/* Description */}
       {task.description && (
         <p className="text-xs text-text-secondary line-clamp-2">{task.description}</p>
+      )}
+
+      {/* Branch badge */}
+      {task.branch && (
+        <div className="flex items-center gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3 text-text-muted">
+            <path fillRule="evenodd" d="M9.487 4.63a1.5 1.5 0 1 1 .927-1.406 2.5 2.5 0 0 1 .214 3.59L8.053 9.75H14.5a.75.75 0 0 1 0 1.5H8.053l2.575 2.936a2.5 2.5 0 0 1-.214 3.59 1.5 1.5 0 1 1-.927-1.406A1 1 0 0 0 9.4 15.5l-3.4-3.879L2.6 15.5a1 1 0 0 0-.087.87 1.5 1.5 0 1 1-.927 1.406 2.5 2.5 0 0 1 .214-3.59L4.375 11.25H1.5a.75.75 0 0 1 0-1.5h2.875L1.8 6.814a2.5 2.5 0 0 1 .214-3.59A1.5 1.5 0 1 1 2.94 4.63 1 1 0 0 0 2.6 5.5L6 9.379 9.4 5.5a1 1 0 0 0 .087-.87Z" clipRule="evenodd" />
+          </svg>
+          <span className="text-xs text-text-muted font-mono truncate">{task.branch}</span>
+        </div>
+      )}
+
+      {/* Dependency status badge */}
+      {depStatus && (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${depStatus.color} ${depStatus.bgColor}`}>
+          {depStatus.label}
+        </span>
       )}
 
       {/* Meta row: priority + time */}
@@ -103,6 +131,11 @@ export function TaskCard({ task, onRun, onCancel, onDelete }: TaskCardProps) {
           >
             Run
           </button>
+        )}
+        {task.status === 'pending' && task.dependency_status !== 'ready' && (
+          <span className="flex-1 text-xs font-medium py-2.5 px-3 min-h-[40px] rounded-md bg-bg-tertiary text-text-muted text-center">
+            {task.dependency_status === 'waiting' ? 'Waiting deps...' : 'Deps blocked'}
+          </span>
         )}
         {canCancel && onCancel && (
           <button
