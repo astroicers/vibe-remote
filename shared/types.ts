@@ -87,7 +87,7 @@ export interface Conversation {
 // --------------------------------------------
 // Diff Review
 // --------------------------------------------
-export type ReviewStatus = 'pending' | 'approved' | 'rejected' | 'commented';
+export type ReviewStatus = 'pending' | 'approved' | 'rejected' | 'partial';
 
 export interface DiffFile {
   path: string;

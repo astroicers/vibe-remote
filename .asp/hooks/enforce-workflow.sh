@@ -203,7 +203,7 @@ MSG
 )"
                     ;;
                 recent)
-                    deny_with_reason "📋 ASP 工作流檢查點 (hitl: $HITL)：修改原始碼 ($SHORT_PATH)。偵測到近期 SPEC 活動，請確認此修改對應當前 SPEC。（system_dev.md）"
+                    deny_with_reason "📋 ASP 工作流檢查點 (hitl: $HITL)：修改原始碼 ($SHORT_PATH)。偵測到近期 SPEC 活動，請確認已按流程進行。（system_dev.md）"
                     ;;
             esac
         fi

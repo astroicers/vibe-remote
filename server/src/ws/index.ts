@@ -8,6 +8,7 @@ export {
   activeRunners,
   MAX_CONCURRENT_RUNNERS,
   abortRunner,
+  staleRunnerCleanupInterval,
 } from './chat-handler.js';
 export { RateLimitStore, rateLimitStore, DEFAULT_RATE_LIMIT_CONFIG } from './rate-limit.js';
 export {

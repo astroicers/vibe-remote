@@ -163,8 +163,8 @@ export function SettingsPage() {
           setAvailableModels(res.models);
         }
       })
-      .catch(() => {
-        // Use fallback models on error
+      .catch((err) => {
+        console.warn('Failed to load models, using fallback:', err);
       });
   }, []);
 
@@ -191,8 +191,8 @@ export function SettingsPage() {
     try {
       const list = await auth.getDevices();
       setDevices(list);
-    } catch {
-      // Silently fail — devices section will just be empty
+    } catch (err) {
+      console.warn('Failed to load devices:', err);
     } finally {
       setDevicesLoading(false);
     }

@@ -225,7 +225,7 @@ function createToolApprovalHandler(
 }
 
 // Periodic stale runner cleanup — abort runners that exceed 1.5x the timeout
-setInterval(() => {
+export const staleRunnerCleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [key, state] of activeRunners) {
     const age = now - state.createdAt;

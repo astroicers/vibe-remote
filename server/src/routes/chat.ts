@@ -239,20 +239,28 @@ export function getConversationHistory(conversationId: string): AIMessage[] {
   return (messages as Array<Record<string, unknown>>).map((msg) => {
     // If there are tool calls, reconstruct the content blocks
     if (msg.tool_calls) {
-      const toolCalls = JSON.parse(msg.tool_calls as string);
-      return {
-        role: msg.role as 'user' | 'assistant',
-        content: toolCalls,
-      };
+      try {
+        const toolCalls = JSON.parse(msg.tool_calls as string);
+        return {
+          role: msg.role as 'user' | 'assistant',
+          content: toolCalls,
+        };
+      } catch {
+        // Corrupted JSON — fall through to plain text
+      }
     }
 
     // If there are tool results, this is a user message with tool results
     if (msg.tool_results) {
-      const toolResults = JSON.parse(msg.tool_results as string);
-      return {
-        role: 'user' as const,
-        content: toolResults,
-      };
+      try {
+        const toolResults = JSON.parse(msg.tool_results as string);
+        return {
+          role: 'user' as const,
+          content: toolResults,
+        };
+      } catch {
+        // Corrupted JSON — fall through to plain text
+      }
     }
 
     return {

@@ -30,6 +30,9 @@ export function initDb(): Database.Database {
   // Enable WAL mode for better concurrent read/write
   db.pragma('journal_mode = WAL');
 
+  // Set busy timeout to avoid SQLITE_BUSY on concurrent access
+  db.pragma('busy_timeout = 5000');
+
   // Enable foreign keys
   db.pragma('foreign_keys = ON');
 
@@ -98,18 +101,14 @@ function runMigrations(database: Database.Database): void {
 
   // Recreate tasks table with extended status CHECK constraint
   // SQLite doesn't support ALTER TABLE to modify CHECK constraints, so we
-  // drop and recreate only if old constraint is still in place.
-  // We detect this by trying to insert a 'pending' row and see if it fails.
-  try {
-    const testId = '__migration_test__';
-    database.prepare(
-      `INSERT INTO tasks (id, workspace_id, title, description, status, priority)
-       VALUES (?, '__test__', '__test__', '__test__', 'pending', 'normal')`
-    ).run(testId);
-    // If we get here, 'pending' is allowed — clean up and move on
-    database.prepare('DELETE FROM tasks WHERE id = ?').run(testId);
-  } catch {
-    // 'pending' is not allowed by old CHECK constraint — recreate the table
+  // detect whether migration is needed by checking the table's SQL definition.
+  const tableInfo = database
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'")
+    .get() as { sql: string } | undefined;
+
+  const needsRecreate = tableInfo?.sql && !tableInfo.sql.includes("'pending'");
+
+  if (needsRecreate) {
     console.log('✅ Migration: Recreating tasks table with extended status values');
     database.exec(`
       CREATE TABLE IF NOT EXISTS tasks_new (
