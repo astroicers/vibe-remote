@@ -14,6 +14,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ### Fixed
 - Android PWA install: added PNG icons (192x192, 512x512, maskable variants) required by Android Chrome
 - Removed service worker force-unregister script that prevented PWA installation
+- Auth resilience: silent JWT token renewal via `X-Renewed-Token` header when token nears expiry (SPEC-013)
+- Auth resilience: client auto-logout with Chinese toast on 401 errors (TOKEN_EXPIRED, DEVICE_REVOKED, INVALID_TOKEN)
+- Auth resilience: WebSocket `auth_error`/`auth_expired` events now include error codes and trigger auto-logout
+- Auth resilience: mid-session WS token validation prevents stale sessions from sending chat messages
 
 ## [0.1.0] — 2026-02-22
 

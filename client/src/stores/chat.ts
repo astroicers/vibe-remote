@@ -196,7 +196,16 @@ export const useChatStore = create<ChatState>((set, get) => {
           }))
         );
       }
-      const errorMsg = data.error as string;
+      const rawError = data.error as string;
+      // Sanitize: if error contains raw JSON (from upstream API), extract a friendly message
+      let errorMsg = rawError;
+      if (rawError && rawError.includes('authentication_error')) {
+        errorMsg = 'Claude API 認證失敗：伺服器的 API token 已過期或無效。請聯繫管理員。';
+      } else if (rawError && rawError.includes('rate_limit')) {
+        errorMsg = 'Claude API 達到速率限制，請稍後再試。';
+      } else if (rawError && rawError.includes('overloaded')) {
+        errorMsg = 'Claude API 目前過載，請稍後再試。';
+      }
       set({ error: errorMsg });
       useToastStore.getState().addToast(errorMsg, 'error');
     });

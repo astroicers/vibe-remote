@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { verifyToken, type JwtPayload } from './jwt.js';
+import { verifyToken, signToken, getTokenRemainingMs, TOKEN_RENEWAL_THRESHOLD_MS, type JwtPayload } from './jwt.js';
 import { getDb } from '../db/index.js';
 
 // Extend Express Request type
@@ -42,6 +42,15 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     // Update last seen
     db.prepare("UPDATE devices SET last_seen_at = datetime('now') WHERE id = ?")
       .run(payload.deviceId);
+
+    // Silent token renewal: if token is valid but nearing expiry, issue a new one
+    const remainingMs = getTokenRemainingMs(token);
+    if (remainingMs > 0 && remainingMs < TOKEN_RENEWAL_THRESHOLD_MS) {
+      res.setHeader('X-Renewed-Token', signToken({
+        deviceId: payload.deviceId,
+        deviceName: payload.deviceName,
+      }));
+    }
 
     req.device = payload;
     next();

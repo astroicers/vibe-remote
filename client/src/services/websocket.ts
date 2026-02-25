@@ -159,6 +159,36 @@ class WebSocketService {
 // Singleton instance
 export const ws = new WebSocketService();
 
+// Auth error handling — listens for auth_error/auth_expired and triggers logout + toast
+let _wsAuthInitialized = false;
+
+const WS_AUTH_ERROR_MESSAGES: Record<string, string> = {
+  TOKEN_EXPIRED: '登入已過期，請重新配對',
+  DEVICE_REVOKED: '裝置已被撤銷，請重新配對',
+  INVALID_TOKEN: '認證無效，請重新配對',
+};
+
+export function initWsAuthErrorHandling(): void {
+  if (_wsAuthInitialized) return;
+  _wsAuthInitialized = true;
+
+  const handleAuthError = (data: Record<string, unknown>) => {
+    const code = (data.code as string) || 'INVALID_TOKEN';
+    const message = WS_AUTH_ERROR_MESSAGES[code] || WS_AUTH_ERROR_MESSAGES.INVALID_TOKEN;
+
+    // Dynamic imports to avoid circular dependency with auth.ts
+    import('../stores/toast').then(({ useToastStore }) => {
+      useToastStore.getState().addToast(message, 'error');
+    });
+    import('../stores/auth').then(({ useAuthStore }) => {
+      useAuthStore.getState().logout();
+    });
+  };
+
+  ws.on('auth_error', handleAuthError);
+  ws.on('auth_expired', handleAuthError);
+}
+
 // Chat-specific helpers
 export function sendChatMessage(
   message: string,

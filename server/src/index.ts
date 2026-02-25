@@ -26,6 +26,7 @@ const { app, getWss } = expressWs(express());
 // Middleware
 app.use(cors({
   origin: config.CORS_ORIGIN === '*' ? true : config.CORS_ORIGIN.split(','),
+  exposedHeaders: ['X-Renewed-Token'],
 }));
 app.use(express.json());
 

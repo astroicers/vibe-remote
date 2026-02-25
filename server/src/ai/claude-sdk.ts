@@ -157,14 +157,22 @@ export class ClaudeSdkRunner extends EventEmitter {
       } else {
         let errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
+        // Detect Anthropic API authentication errors (401 "Invalid bearer token")
+        if (errorMessage.includes('authentication_error') || errorMessage.includes('Invalid bearer token') || errorMessage.includes('API Error: 401')) {
+          errorMessage = 'Claude API 認證失敗：伺服器的 API token 已過期或無效。請聯繫管理員更新 CLAUDE_CODE_OAUTH_TOKEN。';
+        }
+        // Detect Anthropic API rate limit / overloaded errors
+        else if (errorMessage.includes('rate_limit') || errorMessage.includes('overloaded')) {
+          errorMessage = 'Claude API 目前過載或達到速率限制，請稍後再試。';
+        }
         // Provide helpful guidance for common errors
-        if (errorMessage.includes('exit') || errorMessage.includes('code 1')) {
+        else if (errorMessage.includes('exit') || errorMessage.includes('code 1')) {
           const hasOAuthToken = !!process.env.CLAUDE_CODE_OAUTH_TOKEN;
           const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
 
           if (!hasOAuthToken && !hasApiKey) {
             errorMessage =
-              'Claude authentication failed. Please set CLAUDE_CODE_OAUTH_TOKEN (run `claude setup-token`) or ANTHROPIC_API_KEY environment variable.';
+              'Claude 認證失敗：未設定 CLAUDE_CODE_OAUTH_TOKEN 或 ANTHROPIC_API_KEY。請聯繫管理員設定認證。';
           }
         }
 

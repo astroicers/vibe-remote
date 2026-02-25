@@ -17,6 +17,14 @@ class ApiError extends Error {
   }
 }
 
+// Auth error code → Chinese message mapping
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  TOKEN_EXPIRED: '登入已過期，請重新配對',
+  DEVICE_REVOKED: '裝置已被撤銷，請重新配對',
+  INVALID_TOKEN: '認證無效，請重新配對',
+  UNAUTHORIZED: '未授權，請先配對裝置',
+};
+
 async function request<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const token = localStorage.getItem('auth_token');
 
@@ -39,6 +47,36 @@ async function request<T>(endpoint: string, options: FetchOptions = {}): Promise
     headers,
   });
 
+  // Silent token renewal: if server sent a renewed token, save it
+  const renewedToken = response.headers.get('X-Renewed-Token');
+  if (renewedToken) {
+    localStorage.setItem('auth_token', renewedToken);
+    // Also update zustand store (dynamic import to avoid circular dep)
+    import('../stores/auth').then(({ useAuthStore }) => {
+      useAuthStore.setState({ token: renewedToken });
+    });
+  }
+
+  // Handle 401 — auto-logout with descriptive toast
+  if (response.status === 401) {
+    const data = await response.json().catch(() => ({ code: 'UNAUTHORIZED', error: 'Unauthorized' }));
+    const code = data.code || 'UNAUTHORIZED';
+    const message = AUTH_ERROR_MESSAGES[code] || AUTH_ERROR_MESSAGES.UNAUTHORIZED;
+
+    // Only show toast + logout if not during initial checkAuth
+    import('../stores/auth').then(({ useAuthStore }) => {
+      const { _isCheckingAuth } = useAuthStore.getState() as AuthState & { _isCheckingAuth?: boolean };
+      if (!_isCheckingAuth) {
+        import('../stores/toast').then(({ useToastStore }) => {
+          useToastStore.getState().addToast(message, 'error');
+        });
+      }
+      useAuthStore.getState().logout();
+    });
+
+    throw new ApiError(401, code, data.error || 'Unauthorized');
+  }
+
   const data = await response.json();
 
   if (!response.ok) {
@@ -50,6 +88,11 @@ async function request<T>(endpoint: string, options: FetchOptions = {}): Promise
   }
 
   return data as T;
+}
+
+// Re-export AuthState type for internal use (avoids circular import)
+interface AuthState {
+  _isCheckingAuth?: boolean;
 }
 
 // Auth API

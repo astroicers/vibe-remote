@@ -15,6 +15,7 @@ interface AuthState {
   pairingCode: string | null;
   pairingQR: string | null;
   pairingExpiresAt: string | null;
+  _isCheckingAuth: boolean;
 
   // Actions
   devQuickPair: (deviceName: string) => Promise<void>;
@@ -36,6 +37,7 @@ export const useAuthStore = create<AuthState>()(
       pairingCode: null,
       pairingQR: null,
       pairingExpiresAt: null,
+      _isCheckingAuth: false,
 
       devQuickPair: async (deviceName: string) => {
         set({ isLoading: true, error: null });
@@ -110,7 +112,7 @@ export const useAuthStore = create<AuthState>()(
           return;
         }
 
-        set({ isLoading: true });
+        set({ isLoading: true, _isCheckingAuth: true });
         try {
           const device = await auth.getMe();
           set({
@@ -119,6 +121,7 @@ export const useAuthStore = create<AuthState>()(
             deviceName: device.name,
             isAuthenticated: true,
             isLoading: false,
+            _isCheckingAuth: false,
           });
 
           // Connect WebSocket
@@ -132,6 +135,7 @@ export const useAuthStore = create<AuthState>()(
             deviceName: null,
             isAuthenticated: false,
             isLoading: false,
+            _isCheckingAuth: false,
           });
         }
       },

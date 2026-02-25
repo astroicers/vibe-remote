@@ -8,9 +8,14 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ToastContainer } from './components/Toast';
 import { useAuthStore } from './stores/auth';
 import { useSettingsStore } from './stores/settings';
+import { initWsAuthErrorHandling } from './services/websocket';
 
 export default function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  useEffect(() => {
+    initWsAuthErrorHandling();
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {

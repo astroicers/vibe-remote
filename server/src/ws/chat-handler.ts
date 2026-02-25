@@ -57,6 +57,7 @@ interface AuthenticatedSocket extends WebSocket {
   deviceId?: string;
   deviceName?: string;
   isAuthenticated?: boolean;
+  authToken?: string;
 }
 
 // Track all connected WebSocket clients for broadcasting
@@ -263,18 +264,23 @@ export function handleChatWebSocket(ws: AuthenticatedSocket): void {
           .get(payload.deviceId);
 
         if (!device) {
-          send(ws, { type: 'auth_error', error: 'Device not found' });
+          send(ws, { type: 'auth_error', error: 'Device not found or has been revoked', code: 'DEVICE_REVOKED' });
           return;
         }
 
         ws.deviceId = payload.deviceId;
         ws.deviceName = payload.deviceName;
         ws.isAuthenticated = true;
+        ws.authToken = authParsed.data.token;
 
         send(ws, { type: 'auth_success', deviceId: payload.deviceId });
         return;
-      } catch {
-        send(ws, { type: 'auth_error', error: 'Invalid token' });
+      } catch (error) {
+        if (error instanceof Error && error.name === 'TokenExpiredError') {
+          send(ws, { type: 'auth_error', error: 'Token has expired', code: 'TOKEN_EXPIRED' });
+        } else {
+          send(ws, { type: 'auth_error', error: 'Invalid token', code: 'INVALID_TOKEN' });
+        }
         return;
       }
     }
@@ -283,6 +289,18 @@ export function handleChatWebSocket(ws: AuthenticatedSocket): void {
     if (!ws.isAuthenticated) {
       send(ws, { type: 'error', error: 'Not authenticated' });
       return;
+    }
+
+    // Mid-session token validation: re-verify the stored token before processing
+    if (ws.authToken) {
+      try {
+        verifyToken(ws.authToken);
+      } catch {
+        ws.isAuthenticated = false;
+        ws.authToken = undefined;
+        send(ws, { type: 'auth_expired', code: 'TOKEN_EXPIRED', error: 'Session token has expired, please re-authenticate' });
+        return;
+      }
     }
 
     // Handle chat message

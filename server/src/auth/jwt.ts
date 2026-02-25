@@ -26,3 +26,16 @@ export function decodeToken(token: string): JwtPayload | null {
     return null;
   }
 }
+
+/** Tokens with less than this remaining time will be silently renewed */
+export const TOKEN_RENEWAL_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+/**
+ * Returns the remaining time in milliseconds before the token expires.
+ * Returns 0 if the token is already expired or cannot be decoded.
+ */
+export function getTokenRemainingMs(token: string): number {
+  const payload = decodeToken(token);
+  if (!payload?.exp) return 0;
+  return Math.max(0, payload.exp * 1000 - Date.now());
+}
