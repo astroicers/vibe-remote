@@ -5,7 +5,7 @@
 | 欄位 | 內容 |
 |------|------|
 | **規格 ID** | SPEC-005 |
-| **關聯 ADR** | ADR-006（Claude Agent SDK） |
+| **關聯 ADR** | ADR-003（Claude Agent SDK） |
 | **估算複雜度** | 低 |
 | **建議模型** | Sonnet |
 | **HITL 等級** | minimal |
@@ -272,17 +272,17 @@ export const models = {
 
 ## 驗收標準（Done When）
 
-- [ ] `npm --prefix server run test:run` 全數通過（含新增 `models.ts` 的 `resolveModelId` 單元測試）
-- [ ] `npm --prefix client run test:run` 全數通過
-- [ ] `cd server && npx tsc --noEmit` 無錯誤
-- [ ] `cd client && npx tsc --noEmit` 無錯誤
-- [ ] `GET /api/models` 回傳 3 個模型的 JSON（haiku、sonnet、opus）
-- [ ] Settings 頁面顯示 3 個模型選項（Haiku、Sonnet、Opus）
-- [ ] 選擇 Haiku 後在 Chat 發送訊息，WS message 的 `model` 欄位為 `'haiku'`
-- [ ] Server chat-handler 收到 `'haiku'` 後解析為 `'claude-haiku-4-5-20251001'` 傳給 SDK runner
-- [ ] `client/src/stores/chat.ts` 不再包含任何硬編碼的 model ID 字串
-- [ ] Task runner 使用 `resolveModelId()` 取得 model（從 server config default）
-- [ ] 舊版 localStorage（含 `model: 'sonnet'`）升級後 Settings 顯示正常
+- [x] `npm --prefix server run test:run` 全數通過（含新增 `models.ts` 的 `resolveModelId` 單元測試）
+- [x] `npm --prefix client run test:run` 全數通過
+- [x] `cd server && npx tsc --noEmit` 無錯誤
+- [x] `cd client && npx tsc --noEmit` 無錯誤
+- [x] `GET /api/models` 回傳 3 個模型的 JSON（haiku、sonnet、opus）
+- [x] Settings 頁面顯示 3 個模型選項（Haiku、Sonnet、Opus）
+- [x] 選擇 Haiku 後在 Chat 發送訊息，WS message 的 `model` 欄位為 `'haiku'`
+- [x] Server chat-handler 收到 `'haiku'` 後解析為 `'claude-haiku-4-5-20251001'` 傳給 SDK runner
+- [x] `client/src/stores/chat.ts` 不再包含任何硬編碼的 model ID 字串
+- [x] Task runner 使用 `resolveModelId()` 取得 model（從 server config default）
+- [x] 舊版 localStorage（含 `model: 'sonnet'`）升級後 Settings 顯示正常
 
 ---
 

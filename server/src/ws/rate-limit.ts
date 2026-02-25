@@ -1,6 +1,8 @@
 // Rate Limiting Module
 // Extracted from chat-handler for testability
 
+import { config } from '../config.js';
+
 export interface RateLimitConfig {
   windowMs: number;
   maxRequests: number;
@@ -103,5 +105,8 @@ export class RateLimitStore {
   }
 }
 
-// Singleton instance for app-wide use
-export const rateLimitStore = new RateLimitStore();
+// Singleton instance for app-wide use (uses env config values)
+export const rateLimitStore = new RateLimitStore({
+  windowMs: config.RATE_LIMIT_WINDOW_MS,
+  maxRequests: config.RATE_LIMIT_MAX_REQUESTS,
+});

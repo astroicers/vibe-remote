@@ -168,7 +168,7 @@ export async function runTask(
         workspacePath: workspace.path,
         systemPrompt: workspace.systemPrompt || undefined,
         permissionMode: 'bypassPermissions',
-        maxTurns: 30,
+        maxTurns: config.MAX_TURNS_TASK,
         model: resolveModelId(),  // uses server default
       }),
       config.RUNNER_TIMEOUT_MS,

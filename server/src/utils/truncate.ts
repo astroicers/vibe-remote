@@ -3,13 +3,14 @@
 
 import { statSync } from 'fs';
 import { extname } from 'path';
+import { config } from '../config.js';
 
 /** Content size limits */
 export const LIMITS = {
   /** Maximum characters for a single message */
   messageContent: 2000,
   /** Maximum messages to include in history (fallback when no session resume) */
-  historyCount: 5,
+  historyCount: config.CONTEXT_HISTORY_COUNT,
   /** Maximum size for text files (1MB) */
   textFileSize: 1 * 1024 * 1024,
   /** Maximum size for non-text attachments (20MB) */

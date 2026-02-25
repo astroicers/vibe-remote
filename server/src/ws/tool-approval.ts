@@ -1,6 +1,8 @@
 // Tool Approval Module
 // Promise-based tool approval mechanism inspired by Claude-by-Discord
 
+import { config } from '../config.js';
+
 export interface ToolUseInfo {
   id: string;
   name: string;
@@ -31,7 +33,7 @@ export interface ToolApprovalConfig {
 }
 
 export const DEFAULT_TOOL_APPROVAL_CONFIG: ToolApprovalConfig = {
-  timeoutMs: 120000, // 2 minutes
+  timeoutMs: config.TOOL_APPROVAL_TIMEOUT_MS,
   autoApproveReadOnly: true,
 };
 

@@ -277,21 +277,21 @@ export const settings = {
 
 ## 驗收標準（Done When）
 
-- [ ] `npm --prefix server run test:run` 全數通過（含新增 settings 相關測試）
-- [ ] `npm --prefix client run test:run` 全數通過
-- [ ] `cd server && npx tsc --noEmit` 無錯誤
-- [ ] `cd client && npx tsc --noEmit` 無錯誤
-- [ ] `GET /api/settings` 回傳當前裝置的所有設定（已認證）
-- [ ] `PUT /api/settings` 批量更新設定後回傳完整設定 map
-- [ ] `PATCH /api/settings/:key` 更新單一設定
-- [ ] `DELETE /api/settings/:key` 刪除單一設定
-- [ ] 未認證的請求回傳 401
-- [ ] `device_settings` 表在 app 啟動時自動建立（`CREATE TABLE IF NOT EXISTS`）
-- [ ] Client 在認證成功後自動從 server 載入設定（server wins merge）
-- [ ] Client 首次遷移：localStorage 有值但 server 無值時，自動推送至 server
-- [ ] Client 設定變更後 500ms 內 debounce 推送至 server
-- [ ] Server 不可達時，client 仍可正常使用 localStorage 中的設定
-- [ ] 裝置撤銷後，`device_settings` 記錄自動清除（CASCADE）
+- [x] `npm --prefix server run test:run` 全數通過（含新增 settings 相關測試）
+- [x] `npm --prefix client run test:run` 全數通過
+- [x] `cd server && npx tsc --noEmit` 無錯誤
+- [x] `cd client && npx tsc --noEmit` 無錯誤
+- [x] `GET /api/settings` 回傳當前裝置的所有設定（已認證）
+- [x] `PUT /api/settings` 批量更新設定後回傳完整設定 map
+- [x] `PATCH /api/settings/:key` 更新單一設定
+- [x] `DELETE /api/settings/:key` 刪除單一設定
+- [x] 未認證的請求回傳 401
+- [x] `device_settings` 表在 app 啟動時自動建立（`CREATE TABLE IF NOT EXISTS`）
+- [x] Client 在認證成功後自動從 server 載入設定（server wins merge）
+- [x] Client 首次遷移：localStorage 有值但 server 無值時，自動推送至 server
+- [x] Client 設定變更後 500ms 內 debounce 推送至 server
+- [x] Server 不可達時，client 仍可正常使用 localStorage 中的設定
+- [x] 裝置撤銷後，`device_settings` 記錄自動清除（CASCADE）
 
 ---
 

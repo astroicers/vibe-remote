@@ -26,6 +26,44 @@ import {
 
 const router = Router();
 
+/**
+ * Recursively scan for git repositories up to maxDepth levels deep.
+ * Stops descending into a directory once .git is found (no submodule scanning).
+ */
+function scanGitRepos(
+  dir: string,
+  maxDepth: number,
+  currentDepth: number = 0,
+): Array<{ name: string; fullPath: string }> {
+  if (currentDepth >= maxDepth) return [];
+
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return []; // permission denied, etc.
+  }
+
+  const results: Array<{ name: string; fullPath: string }> = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name.startsWith('.')) continue;
+    if (entry.name === 'node_modules') continue;
+
+    const fullPath = join(dir, entry.name);
+    const gitPath = join(fullPath, '.git');
+
+    if (existsSync(gitPath)) {
+      results.push({ name: entry.name, fullPath });
+    } else {
+      results.push(...scanGitRepos(fullPath, maxDepth, currentDepth + 1));
+    }
+  }
+
+  return results;
+}
+
 // Apply auth to all workspace routes
 router.use(authMiddleware);
 
@@ -41,7 +79,7 @@ router.get('/scan/default-path', (_req, res) => {
   res.json({ path: defaultPath });
 });
 
-// Scan a directory for git repositories (immediate subdirectories with .git)
+// Scan a directory for git repositories (recursive, up to depth levels deep)
 router.get('/scan', (req, res) => {
   const scanPath = req.query.path as string | undefined;
   if (!scanPath) {
@@ -51,6 +89,8 @@ router.get('/scan', (req, res) => {
     });
     return;
   }
+
+  const depth = Math.min(Math.max(parseInt(req.query.depth as string) || 5, 1), 10);
 
   // Map host path to container path if running in Docker
   let resolvedPath = scanPath;
@@ -74,35 +114,22 @@ router.get('/scan', (req, res) => {
   }
 
   try {
-    const entries = readdirSync(resolvedPath, { withFileTypes: true });
-    const repos: Array<{ name: string; path: string; hasGit: boolean }> = [];
+    const found = scanGitRepos(resolvedPath, depth);
 
     // Get already registered workspace paths
     const registered = new Set(listWorkspaces().map((w) => w.path));
 
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      // Skip hidden directories
-      if (entry.name.startsWith('.')) continue;
+    const repos = found.map(({ name, fullPath }) => ({
+      name,
+      // Return the host path (not container path) so client can display what user expects
+      path: hostPath
+        ? fullPath.replace(config.WORKSPACE_CONTAINER_PATH.replace(/\/+$/, ''), hostPath.replace(/\/+$/, ''))
+        : fullPath,
+      hasGit: true,
+    }));
 
-      const fullPath = join(resolvedPath, entry.name);
-      const gitPath = join(fullPath, '.git');
-      const hasGit = existsSync(gitPath);
-
-      if (hasGit) {
-        repos.push({
-          name: entry.name,
-          // Return the host path (not container path) so client can display what user expects
-          path: hostPath
-            ? fullPath.replace(config.WORKSPACE_CONTAINER_PATH.replace(/\/+$/, ''), hostPath.replace(/\/+$/, ''))
-            : fullPath,
-          hasGit: true,
-        });
-      }
-    }
-
-    // Sort alphabetically
-    repos.sort((a, b) => a.name.localeCompare(b.name));
+    // Sort alphabetically by path for consistent grouping of nested repos
+    repos.sort((a, b) => a.path.localeCompare(b.path));
 
     // Mark which ones are already registered
     const result = repos.map((repo) => {

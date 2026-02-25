@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Task } from './manager.js';
 
-// Mock config for models module
+// Mock config for models module and runner
 vi.mock('../config.js', () => ({
   config: {
     CLAUDE_MODEL: 'claude-sonnet-4-20250514',
+    RUNNER_TIMEOUT_MS: 600000,
+    MAX_TURNS_TASK: 30,
   },
 }));
 

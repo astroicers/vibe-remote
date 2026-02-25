@@ -229,17 +229,17 @@ if (!readyTask) return;
 
 ## 驗收標準（Done When）
 
-- [ ] `npm --prefix server run test:run` 全數通過（含新增依賴相關測試）
-- [ ] `npm --prefix client run test:run` 全數通過
-- [ ] `cd server && npx tsc --noEmit` 無錯誤
-- [ ] `cd client && npx tsc --noEmit` 無錯誤
-- [ ] 建立 task 時可指定 `dependsOn`（API 回傳可驗證）
-- [ ] 循環依賴被正確拒絕（400 + error message）
-- [ ] Queue 自動跳過依賴未滿足的 task
-- [ ] 依賴 task 完成後，下游 task 自動被 queue 撈到執行
-- [ ] Task 列表正確顯示 `dependencyStatus`
-- [ ] Client UI 可選擇依賴任務
-- [ ] 刪除 task 前檢查下游依賴
+- [x] `npm --prefix server run test:run` 全數通過（含新增依賴相關測試）
+- [x] `npm --prefix client run test:run` 全數通過
+- [x] `cd server && npx tsc --noEmit` 無錯誤
+- [x] `cd client && npx tsc --noEmit` 無錯誤
+- [x] 建立 task 時可指定 `dependsOn`（API 回傳可驗證）
+- [x] 循環依賴被正確拒絕（400 + error message）
+- [x] Queue 自動跳過依賴未滿足的 task
+- [x] 依賴 task 完成後，下游 task 自動被 queue 撈到執行
+- [x] Task 列表正確顯示 `dependencyStatus`
+- [x] Client UI 可選擇依賴任務
+- [x] 刪除 task 前檢查下游依賴
 
 ---
 

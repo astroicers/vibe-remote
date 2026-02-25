@@ -278,7 +278,14 @@ export function ReposPage() {
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  {scannedRepos.map((repo) => (
+                  {scannedRepos.map((repo) => {
+                    // Show relative path from projectsPath for clearer display of nested repos
+                    const normalizedBase = projectsPath?.replace(/\/+$/, '');
+                    const relativePath = normalizedBase && repo.path.startsWith(normalizedBase + '/')
+                      ? repo.path.slice(normalizedBase.length + 1)
+                      : repo.path;
+
+                    return (
                     <div
                       key={repo.path}
                       className={`flex items-center gap-3 p-3 rounded-xl ${
@@ -292,7 +299,7 @@ export function ReposPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-text-primary truncate">{repo.name}</p>
-                        <p className="text-xs text-text-muted truncate">{repo.path}</p>
+                        <p className="text-xs text-text-muted truncate">{relativePath}</p>
                       </div>
                       {repo.isRegistered ? (
                         <span className="text-xs text-text-muted px-2 py-1 bg-bg-tertiary rounded-lg flex-shrink-0">Added</span>
@@ -306,7 +313,8 @@ export function ReposPage() {
                         </button>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 

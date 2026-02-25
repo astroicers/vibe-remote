@@ -171,14 +171,14 @@ export function useTaskWebSocket(): void {
 
 ## 驗收標準（Done When）
 
-- [ ] `npm --prefix client run test:run` 全數通過
-- [ ] `cd client && npx tsc --noEmit` 無錯誤
-- [ ] 新增 `client/src/hooks/useTaskWebSocket.ts` 檔案存在且包含 WS 訂閱邏輯
-- [ ] `TasksPage.tsx` 內呼叫 `useTaskWebSocket()` hook
-- [ ] 手動測試：透過 API 建立 task 並 run，Tasks 頁面即時從 Pending → Running → Completed/Failed 移動卡片
-- [ ] 手動測試：task 完成時出現 success toast；失敗時出現 error toast
-- [ ] 手動測試：離開 Tasks 頁面後再返回，task 列表正確顯示最新狀態
-- [ ] 新增單元測試：`useTaskWebSocket` hook 測試（驗證 subscribe/unsubscribe lifecycle 和 store 呼叫）
+- [x] `npm --prefix client run test:run` 全數通過
+- [x] `cd client && npx tsc --noEmit` 無錯誤
+- [x] 新增 `client/src/hooks/useTaskWebSocket.ts` 檔案存在且包含 WS 訂閱邏輯
+- [x] `TasksPage.tsx` 內呼叫 `useTaskWebSocket()` hook
+- [x] 手動測試：透過 API 建立 task 並 run，Tasks 頁面即時從 Pending → Running → Completed/Failed 移動卡片
+- [x] 手動測試：task 完成時出現 success toast；失敗時出現 error toast
+- [x] 手動測試：離開 Tasks 頁面後再返回，task 列表正確顯示最新狀態
+- [x] 新增單元測試：`useTaskWebSocket` hook 測試（驗證 subscribe/unsubscribe lifecycle 和 store 呼叫）
 
 ---
 

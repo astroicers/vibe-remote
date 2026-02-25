@@ -141,15 +141,15 @@
 
 ## 驗收標準（Done When）
 
-- [ ] `npm --prefix server run test:run` 全數通過（含新增 branch 相關測試）
-- [ ] `npm --prefix client run test:run` 全數通過
-- [ ] `cd server && npx tsc --noEmit` 無錯誤
-- [ ] `cd client && npx tsc --noEmit` 無錯誤
-- [ ] 建立 task 時 branch 欄位正確產生（API 回傳可驗證）
-- [ ] Task 執行時自動建立 Git branch 並切換
-- [ ] Task 完成後變更保留在 task branch 上
-- [ ] Diff review 可看到 task branch 的變更
-- [ ] Task 失敗時 workspace 恢復到原始狀態（stash pop）
+- [x] `npm --prefix server run test:run` 全數通過（含新增 branch 相關測試）
+- [x] `npm --prefix client run test:run` 全數通過
+- [x] `cd server && npx tsc --noEmit` 無錯誤
+- [x] `cd client && npx tsc --noEmit` 無錯誤
+- [x] 建立 task 時 branch 欄位正確產生（API 回傳可驗證）
+- [x] Task 執行時自動建立 Git branch 並切換
+- [x] Task 完成後變更保留在 task branch 上
+- [x] Diff review 可看到 task branch 的變更
+- [x] Task 失敗時 workspace 恢復到原始狀態（stash pop）
 
 ---
 

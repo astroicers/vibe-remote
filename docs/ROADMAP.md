@@ -165,6 +165,13 @@
 | Settings persistence (server-side) | SPEC-006 | [done] |
 | Task status WebSocket client wiring | SPEC-007 | [done] |
 
+### Enhancements (2026-02-25)
+
+| Item | SPEC | Status |
+|------|------|--------|
+| Recursive workspace scan (depth up to 5) | SPEC-011 | [done] |
+| Env config expansion (8 new configurable params) | SPEC-012 | [done] |
+
 ### Remaining
 - Batch task creation（SPEC-002 有部分基礎，完整 UI 待實作）
 - BullMQ + Redis migration（deferred to later phase）

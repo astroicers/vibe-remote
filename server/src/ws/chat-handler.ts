@@ -117,17 +117,15 @@ export function broadcastTaskEvent(event: {
 
 // Rate limiting
 const rateLimitMap = new Map<string, number[]>();
-const RATE_LIMIT_WINDOW = 60000; // 1 minute
-const RATE_LIMIT_MAX = 10; // 10 messages per minute
 
 function checkRateLimit(deviceId: string): boolean {
   const now = Date.now();
   const timestamps = rateLimitMap.get(deviceId) || [];
 
   // Remove old timestamps
-  const recentTimestamps = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW);
+  const recentTimestamps = timestamps.filter((t) => now - t < config.RATE_LIMIT_WINDOW_MS);
 
-  if (recentTimestamps.length >= RATE_LIMIT_MAX) {
+  if (recentTimestamps.length >= config.RATE_LIMIT_MAX_REQUESTS) {
     return false;
   }
 
@@ -150,7 +148,7 @@ interface RunnerState {
   createdAt: number;
 }
 export const activeRunners = new Map<string, RunnerState>();
-export const MAX_CONCURRENT_RUNNERS = 3;
+export const MAX_CONCURRENT_RUNNERS = config.MAX_CONCURRENT_RUNNERS;
 
 function runnerKey(workspaceId: string, conversationId: string): string {
   return `${workspaceId}:${conversationId}`;
@@ -640,7 +638,7 @@ async function handleChatMessage(
     workspacePath: workspace.path,
     systemPrompt: workspace.systemPrompt || undefined,
     permissionMode: 'bypassPermissions',
-    maxTurns: 20,
+    maxTurns: config.MAX_TURNS_CHAT,
     resumeSessionId: conversation.sdk_session_id || undefined,
     model: resolveModelId(data.model),
   };
@@ -916,7 +914,7 @@ export async function sendFeedbackToAI(params: {
     workspacePath: workspace.path,
     systemPrompt: workspace.systemPrompt || undefined,
     permissionMode: 'bypassPermissions',
-    maxTurns: 20,
+    maxTurns: config.MAX_TURNS_CHAT,
     resumeSessionId: conversation?.sdk_session_id || undefined,
     model: resolveModelId(model),
   };

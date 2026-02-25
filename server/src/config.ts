@@ -19,6 +19,20 @@ const envSchema = z.object({
     .default('bypassPermissions'),
   RUNNER_TIMEOUT_MS: z.string().optional().default('600000').transform(Number),  // 10 minutes
   TOOL_APPROVAL_ENABLED: z.string().optional().default('false').transform(v => v === 'true'),
+  MAX_CONCURRENT_RUNNERS: z.string().optional().default('3').transform(Number),
+  MAX_TURNS_CHAT: z.string().optional().default('20').transform(Number),
+  MAX_TURNS_TASK: z.string().optional().default('30').transform(Number),
+  TOOL_APPROVAL_TIMEOUT_MS: z.string().optional().default('120000').transform(Number),
+
+  // Rate limiting
+  RATE_LIMIT_WINDOW_MS: z.string().optional().default('60000').transform(Number),
+  RATE_LIMIT_MAX_REQUESTS: z.string().optional().default('10').transform(Number),
+
+  // Security
+  CORS_ORIGIN: z.string().optional().default('*'),
+
+  // AI Context
+  CONTEXT_HISTORY_COUNT: z.string().optional().default('5').transform(Number),
 
   // Database
   DATABASE_PATH: z.string().default('./data/vibe-remote.db'),

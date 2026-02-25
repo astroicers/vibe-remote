@@ -501,19 +501,19 @@ useEffect(() => {
 
 ## 驗收標準（Done When）
 
-- [ ] `npm --prefix server run test:run` 全數通過（含新增 streaming 相關測試）
-- [ ] `npm --prefix client run test:run` 全數通過
-- [ ] `cd server && npx tsc --noEmit` 無錯誤
-- [ ] `cd client && npx tsc --noEmit` 無錯誤
-- [ ] Task 執行期間，WS Client 收到 `task_progress` 事件，包含 AI 文字串流
-- [ ] Task 執行期間，AI 呼叫工具時 Client 收到 `task_tool_use` 和 `task_tool_result` 事件
-- [ ] Task 完成時 Client 收到 `task_complete` 事件，包含 `modifiedFiles` 和 `tokenUsage`
-- [ ] Task 失敗時 Client 收到 `task_complete` 事件，`status: 'failed'` 且包含 `error`
-- [ ] `task_progress` 文字串流有 100ms 節流（同一 task 不會每毫秒發送一次）
-- [ ] 既有 `task_status` 事件不受影響，繼續正常運作
-- [ ] `runTask()` 不傳 `onEvent` 時行為與修改前一致（向後相容）
-- [ ] Client `useTaskStore` 有 `handleTaskProgress` / `handleTaskComplete` 方法
-- [ ] Client App 層級有 WS 事件訂閱，呼叫 store handler
+- [x] `npm --prefix server run test:run` 全數通過（含新增 streaming 相關測試）
+- [x] `npm --prefix client run test:run` 全數通過
+- [x] `cd server && npx tsc --noEmit` 無錯誤
+- [x] `cd client && npx tsc --noEmit` 無錯誤
+- [x] Task 執行期間，WS Client 收到 `task_progress` 事件，包含 AI 文字串流
+- [x] Task 執行期間，AI 呼叫工具時 Client 收到 `task_tool_use` 和 `task_tool_result` 事件
+- [x] Task 完成時 Client 收到 `task_complete` 事件，包含 `modifiedFiles` 和 `tokenUsage`
+- [x] Task 失敗時 Client 收到 `task_complete` 事件，`status: 'failed'` 且包含 `error`
+- [x] `task_progress` 文字串流有 100ms 節流（同一 task 不會每毫秒發送一次）
+- [x] 既有 `task_status` 事件不受影響，繼續正常運作
+- [x] `runTask()` 不傳 `onEvent` 時行為與修改前一致（向後相容）
+- [x] Client `useTaskStore` 有 `handleTaskProgress` / `handleTaskComplete` 方法
+- [x] Client App 層級有 WS 事件訂閱，呼叫 store handler
 
 ---
 

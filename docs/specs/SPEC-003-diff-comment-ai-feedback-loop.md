@@ -338,20 +338,20 @@ export type WSEventType =
 
 ## 驗收標準（Done When）
 
-- [ ] `npm --prefix server run test:run` 全數通過（含新增 feedback endpoint 測試）
-- [ ] `npm --prefix client run test:run` 全數通過
-- [ ] `cd server && npx tsc --noEmit` 無錯誤
-- [ ] `cd client && npx tsc --noEmit` 無錯誤
-- [ ] `POST /api/diff/reviews/:id/feedback` 回傳 202 並開始背景 AI 處理
-- [ ] AI 處理期間 WS 廣播 `feedback_processing` + streaming 事件
-- [ ] AI 完成且有檔案變更時自動建立新 diff review
-- [ ] Client 收到 `diff_ready`（isFeedbackResult=true）後自動載入新 review，URL 更新
-- [ ] DiffPage 顯示 feedback processing loading 狀態
-- [ ] DiffCommentList 的「Send feedback to AI」按鈕改用新 API（不再建立新 conversation、不再導航到 ChatPage）
-- [ ] DiffPage 的「Reject All → Send Feedback to AI?」dialog 改用新 API
-- [ ] Review 無 conversationId 時能自動建立 conversation 並正確關聯
-- [ ] Runner busy / rate limit 情境正確回傳 409/429 並在 client 顯示 toast
-- [ ] Review 已 rejected（files discarded）時 prompt 包含重新實作指示
+- [x] `npm --prefix server run test:run` 全數通過（含新增 feedback endpoint 測試）
+- [x] `npm --prefix client run test:run` 全數通過
+- [x] `cd server && npx tsc --noEmit` 無錯誤
+- [x] `cd client && npx tsc --noEmit` 無錯誤
+- [x] `POST /api/diff/reviews/:id/feedback` 回傳 202 並開始背景 AI 處理
+- [x] AI 處理期間 WS 廣播 `feedback_processing` + streaming 事件
+- [x] AI 完成且有檔案變更時自動建立新 diff review
+- [x] Client 收到 `diff_ready`（isFeedbackResult=true）後自動載入新 review，URL 更新
+- [x] DiffPage 顯示 feedback processing loading 狀態
+- [x] DiffCommentList 的「Send feedback to AI」按鈕改用新 API（不再建立新 conversation、不再導航到 ChatPage）
+- [x] DiffPage 的「Reject All → Send Feedback to AI?」dialog 改用新 API
+- [x] Review 無 conversationId 時能自動建立 conversation 並正確關聯
+- [x] Runner busy / rate limit 情境正確回傳 409/429 並在 client 顯示 toast
+- [x] Review 已 rejected（files discarded）時 prompt 包含重新實作指示
 
 ---
 
