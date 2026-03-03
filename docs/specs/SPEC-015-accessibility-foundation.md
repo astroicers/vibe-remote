@@ -72,15 +72,15 @@
 
 ## 驗收標準（Done When）
 
-- [ ] `cd client && npx tsc --noEmit` 無錯誤
-- [ ] `npm --prefix client run test:run` 全數通過
-- [ ] 所有 icon button ≥ w-11 h-11 (44px)
-- [ ] 所有 icon-only 按鈕有 aria-label
-- [ ] BottomSheet/ConfirmDialog 有 role + aria-modal + focus trap
-- [ ] Toast 有 role="alert"
-- [ ] `--text-muted` = `#71717a`
-- [ ] globals.css 有 prefers-reduced-motion 規則
-- [ ] 新增 useFocusTrap hook + 測試
+- [x] `cd client && npx tsc --noEmit` 無錯誤
+- [x] `npm --prefix client run test:run` 全數通過
+- [x] 所有 icon button ≥ w-11 h-11 (44px)
+- [x] 所有 icon-only 按鈕有 aria-label
+- [x] BottomSheet/ConfirmDialog 有 role + aria-modal + focus trap
+- [x] Toast 有 role="alert"
+- [x] `--text-muted` = `#71717a`
+- [x] globals.css 有 prefers-reduced-motion 規則
+- [x] 新增 useFocusTrap hook + 測試
 
 ---
 

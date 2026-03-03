@@ -32,15 +32,15 @@
 
 ## 驗收標準（Done When）
 
-- [ ] `cd client && npx tsc --noEmit` 無錯誤
-- [ ] `npm --prefix client run test:run` 全數通過
-- [ ] `.btn` 有 `min-h-[44px]`
-- [ ] 新增 `.card-static` 樣式並套用於靜態卡片
-- [ ] badge 系統有 `.badge-sm` / `.badge-accent` / `.badge-success` / `.badge-warning` variant
-- [ ] Code block `text-[13px]` + `leading-relaxed` + 左側 accent 邊線
-- [ ] ActionButton loading 時底部有 progress bar
-- [ ] ChatInput textarea `focus:shadow-glow`
-- [ ] BranchSelector input `min-h-[44px]` + `focus:shadow-glow`
+- [x] `cd client && npx tsc --noEmit` 無錯誤
+- [x] `npm --prefix client run test:run` 全數通過
+- [x] `.btn` 有 `min-h-[44px]`
+- [x] 新增 `.card-static` 樣式並套用於靜態卡片
+- [x] badge 系統有 `.badge-sm` / `.badge-accent` / `.badge-success` / `.badge-warning` variant
+- [x] Code block `text-[13px]` + `leading-relaxed` + 左側 accent 邊線
+- [x] ActionButton loading 時底部有 progress bar
+- [x] ChatInput textarea `focus:shadow-glow`
+- [x] BranchSelector input `min-h-[44px]` + `focus:shadow-glow`
 
 ---
 

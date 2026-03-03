@@ -32,15 +32,15 @@
 
 ## 驗收標準（Done When）
 
-- [ ] `cd client && npx tsc --noEmit` 無錯誤
-- [ ] `npm --prefix client run test:run` 全數通過
-- [ ] MessageList 向上捲動時出現 scroll-to-bottom 按鈕
-- [ ] ChatInput toolbar 不在窄螢幕斷行 (flex-nowrap)
-- [ ] Loading 狀態使用 Skeleton 而非 "Loading..." 文字
-- [ ] DiffPage/ReposPage/TasksPage error 有 Retry 按鈕
-- [ ] DiffPage 檔案標題為兩行排版
-- [ ] SettingsPage 各段有視覺分隔
-- [ ] ReposPage Modal Close 按鈕不被捲走
+- [x] `cd client && npx tsc --noEmit` 無錯誤
+- [x] `npm --prefix client run test:run` 全數通過
+- [x] MessageList 向上捲動時出現 scroll-to-bottom 按鈕
+- [x] ChatInput toolbar 不在窄螢幕斷行 (flex-nowrap)
+- [x] Loading 狀態使用 Skeleton 而非 "Loading..." 文字
+- [x] DiffPage/ReposPage/TasksPage error 有 Retry 按鈕
+- [x] DiffPage 檔案標題為兩行排版
+- [x] SettingsPage 各段有視覺分隔
+- [x] ReposPage Modal Close 按鈕不被捲走
 
 ---
 

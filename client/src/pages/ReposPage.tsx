@@ -119,7 +119,7 @@ export function ReposPage() {
 
   // Git status summary text
   const getGitStatusText = (status: typeof gitStatus) => {
-    if (!status) return 'Loading...';
+    if (!status) return '...';
 
     const totalChanges = status.staged + status.unstaged + status.untracked;
     if (totalChanges > 0) return `${totalChanges} changes`;

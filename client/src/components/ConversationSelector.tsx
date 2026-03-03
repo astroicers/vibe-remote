@@ -152,6 +152,7 @@ export function ConversationSelector({
                     <button
                       onClick={(e) => handleDeleteTap(e, conv.id)}
                       disabled={isDeleting}
+                      aria-label="Delete conversation"
                       className="w-11 h-11 flex items-center justify-center rounded-full text-text-muted hover:text-danger hover:bg-danger/10 transition-colors flex-shrink-0"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">

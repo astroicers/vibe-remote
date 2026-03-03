@@ -149,9 +149,11 @@ describe('DiffPage', () => {
   it('shows loading state when isLoading is true', () => {
     mockWorkspaceStoreState.selectedWorkspaceId = 'ws-1';
     mockDiffStoreState.isLoading = true;
-    renderDiffPage();
+    const { container } = renderDiffPage();
 
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    // Loading state now uses skeleton placeholders instead of text
+    const skeletons = container.querySelectorAll('.animate-pulse');
+    expect(skeletons.length).toBeGreaterThan(0);
   });
 
   it('shows error banner when error is set', () => {

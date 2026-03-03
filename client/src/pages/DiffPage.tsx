@@ -216,8 +216,12 @@ export function DiffPage() {
 
       {/* Loading state */}
       {isLoading && (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-text-muted">Loading...</div>
+        <div className="flex-1 p-4">
+          <div className="space-y-3">
+            <div className="h-10 bg-bg-tertiary rounded-xl animate-pulse" />
+            <div className="h-48 bg-bg-tertiary rounded-xl animate-pulse" />
+            <div className="h-10 bg-bg-tertiary rounded-xl animate-pulse w-2/3" />
+          </div>
         </div>
       )}
 
