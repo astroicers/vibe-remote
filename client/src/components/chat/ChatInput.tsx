@@ -117,7 +117,7 @@ export function ChatInput({
 
       {/* Expandable toolbar */}
       {showToolbar && (
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-border animate-fade-in overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-border animate-fade-in overflow-x-auto scrollbar-hide flex-nowrap">
           {onQuickActions && (
             <button
               onClick={() => handleToolbarAction(onQuickActions)}

@@ -189,11 +189,28 @@ export function DiffPage() {
       {error && (
         <div className="px-4 py-2 bg-danger/20 text-danger text-sm flex items-center justify-between flex-shrink-0">
           <span>{error}</span>
-          <button onClick={clearError} className="w-11 h-11 flex items-center justify-center text-danger hover:text-danger/80" aria-label="Dismiss error">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-              <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              onClick={() => {
+                clearError();
+                if (wsId) {
+                  if (reviewId) {
+                    loadReview(wsId, reviewId);
+                  } else {
+                    loadCurrentDiff(wsId);
+                  }
+                }
+              }}
+              className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-full text-xs font-medium transition-colors flex-shrink-0"
+            >
+              Retry
+            </button>
+            <button onClick={clearError} className="w-11 h-11 flex items-center justify-center text-danger hover:text-danger/80" aria-label="Dismiss error">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 
@@ -234,22 +251,21 @@ export function DiffPage() {
             <div>
               {/* File header with prev/next navigation */}
               <div className="sticky top-0 z-10 px-4 py-2.5 bg-bg-secondary border-b border-border">
-                <div className="flex items-center gap-2">
-                  {/* Prev button */}
-                  <button
-                    onClick={goToPrevFile}
-                    disabled={!hasPrev}
-                    className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-bg-tertiary disabled:opacity-30 disabled:hover:bg-transparent"
-                    aria-label="Previous file"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-text-secondary">
-                      <path fillRule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clipRule="evenodd" />
-                    </svg>
-                  </button>
+                <div className="space-y-1.5">
+                  {/* Row 1: Prev / filename + status badge / Next */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={goToPrevFile}
+                      disabled={!hasPrev}
+                      className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-bg-tertiary disabled:opacity-30 disabled:hover:bg-transparent flex-shrink-0"
+                      aria-label="Previous file"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-text-secondary">
+                        <path fillRule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clipRule="evenodd" />
+                      </svg>
+                    </button>
 
-                  {/* File info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0 flex items-center justify-center gap-2">
                       <span
                         className={`flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-xs font-bold ${
                           selectedFile.status === 'added'
@@ -273,44 +289,44 @@ export function DiffPage() {
                         {selectedFile.path.split('/').pop()}
                       </p>
                     </div>
-                    <p className="text-xs text-text-muted truncate mt-0.5">
+
+                    <button
+                      onClick={goToNextFile}
+                      disabled={!hasNext}
+                      className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-bg-tertiary disabled:opacity-30 disabled:hover:bg-transparent flex-shrink-0"
+                      aria-label="Next file"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-text-secondary">
+                        <path fillRule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Row 2: path/stats/counter (left) | Reject + Approve (right) */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-text-muted truncate">
                       {selectedFile.path.split('/').slice(0, -1).join('/') || '/'}{' '}
                       <span className="text-diff-add-text">+{selectedFile.insertions}</span>{' '}
                       <span className="text-diff-del-text">-{selectedFile.deletions}</span>{' '}
                       <span className="text-text-muted">({currentIndex + 1}/{files.length})</span>
                     </p>
+                    {currentReview && currentReview.status === 'pending' && !feedbackProcessing && (
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        <button
+                          onClick={() => wsId && rejectFile(wsId, selectedFile.path)}
+                          className="px-3 py-1.5 text-xs bg-danger/20 text-danger rounded hover:bg-danger/30"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          onClick={() => wsId && approveFile(wsId, selectedFile.path)}
+                          className="px-3 py-1.5 text-xs bg-success/20 text-success rounded hover:bg-success/30"
+                        >
+                          Approve
+                        </button>
+                      </div>
+                    )}
                   </div>
-
-                  {/* Next button */}
-                  <button
-                    onClick={goToNextFile}
-                    disabled={!hasNext}
-                    className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-bg-tertiary disabled:opacity-30 disabled:hover:bg-transparent"
-                    aria-label="Next file"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-text-secondary">
-                      <path fillRule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-
-                  {/* Per-file actions */}
-                  {currentReview && currentReview.status === 'pending' && !feedbackProcessing && (
-                    <>
-                      <div className="w-px h-6 bg-border" />
-                      <button
-                        onClick={() => wsId && rejectFile(wsId, selectedFile.path)}
-                        className="px-3 py-2 min-h-[44px] text-xs bg-danger/20 text-danger rounded hover:bg-danger/30"
-                      >
-                        Reject
-                      </button>
-                      <button
-                        onClick={() => wsId && approveFile(wsId, selectedFile.path)}
-                        className="px-3 py-2 min-h-[44px] text-xs bg-success/20 text-success rounded hover:bg-success/30"
-                      >
-                        Approve
-                      </button>
-                    </>
-                  )}
                 </div>
               </div>
 

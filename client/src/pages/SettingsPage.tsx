@@ -247,7 +247,7 @@ export function SettingsPage() {
       </header>
 
       {/* Content */}
-      <main className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+      <main className="flex-1 overflow-y-auto px-4 py-4 space-y-6 divide-y divide-border/50 [&>section]:pt-6 [&>section:first-child]:pt-0">
         {/* Connection Section */}
         <section>
           <h2 className="text-sm font-medium text-text-muted uppercase tracking-wider px-1 mb-3">Connection</h2>

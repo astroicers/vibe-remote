@@ -1,7 +1,8 @@
 // Message List Component
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MessageBubble } from './MessageBubble';
+import { ScrollToBottomButton } from '../ScrollToBottomButton';
 
 interface Message {
   id: string;
@@ -23,11 +24,13 @@ export function MessageList({
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
   const handleScroll = () => {
     const el = containerRef.current;
     if (!el) return;
     isNearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    setShowScrollButton(!isNearBottom.current);
   };
 
   // Smart auto-scroll: only scroll to bottom if user is near the bottom
@@ -67,7 +70,7 @@ export function MessageList({
   }
 
   return (
-    <div ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-4">
+    <div ref={containerRef} onScroll={handleScroll} className="relative flex-1 overflow-y-auto px-4 py-4">
       {messages.map((message) => (
         <MessageBubble
           key={message.id}
@@ -85,6 +88,13 @@ export function MessageList({
         />
       )}
 
+      <ScrollToBottomButton
+        visible={showScrollButton}
+        onClick={() => {
+          bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+          setShowScrollButton(false);
+        }}
+      />
       <div ref={bottomRef} />
     </div>
   );

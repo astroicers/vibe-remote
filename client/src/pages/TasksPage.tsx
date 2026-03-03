@@ -125,9 +125,22 @@ export function TasksPage() {
       {error && (
         <div className="mx-4 mt-2 p-3 bg-danger/15 text-danger text-sm rounded-lg flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={clearError} className="text-danger hover:text-danger/80 ml-2">
-            <XCircleIcon />
-          </button>
+          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+            <button
+              onClick={() => {
+                clearError();
+                if (workspaceId) {
+                  loadTasks(workspaceId);
+                }
+              }}
+              className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-full text-xs font-medium transition-colors flex-shrink-0"
+            >
+              Retry
+            </button>
+            <button onClick={clearError} className="text-danger hover:text-danger/80">
+              <XCircleIcon />
+            </button>
+          </div>
         </div>
       )}
 
