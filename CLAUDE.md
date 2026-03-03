@@ -7,18 +7,24 @@
 ## 啟動程序
 
 1. 讀取 `.ai_profile`，依欄位載入對應 profile
-2. **RAG 已啟用時**：回答任何專案架構/規格問題前，先執行 `make rag-search Q="..."`
-3. 無 `.ai_profile` 時：只套用本檔案鐵則，詢問使用者專案類型
+2. **Profile 依賴驗證**：每個 profile 頂部有 `<!-- requires: ... -->` 註解，載入時確認其依賴已載入。缺少依賴 → WARN 並建議使用者補充 `.ai_profile` 設定
+3. **若 `autonomous: enabled`，或 `workflow: vibe-coding` + `hitl: minimal`**：額外載入 `autonomous_dev.md`（同時確保 `vibe_coding.md` 已載入，未設定時自動補載）
+4. **RAG 已啟用時**：回答任何專案架構/規格問題前，先執行 `make rag-search Q="..."`
+5. 無 `.ai_profile` 時：只套用本檔案鐵則，詢問使用者專案類型
 
 ```yaml
 # .ai_profile 完整欄位參考
-type:      system | content | architecture   # 必填
-mode:      single | multi-agent | committee  # 預設 single
-workflow:  standard | vibe-coding            # 預設 standard
-rag:       enabled | disabled               # 預設 disabled
-guardrail: enabled | disabled               # 預設 disabled
-hitl:      minimal | standard | strict      # 預設 standard
-name:      your-project-name
+type:         system | content | architecture   # 必填
+mode:         single | multi-agent | committee  # 預設 single
+workflow:     standard | vibe-coding            # 預設 standard
+rag:          enabled | disabled               # 預設 disabled
+guardrail:    enabled | disabled               # 預設 disabled
+hitl:         minimal | standard | strict      # 預設 standard
+autonomous:   enabled | disabled               # 預設 disabled（AI 全自動開發模式）
+design:       enabled | disabled               # 預設 disabled
+coding_style: enabled | disabled               # 預設 disabled
+openapi:      enabled | disabled               # 預設 disabled
+name:         your-project-name
 ```
 
 **Profile 對應表：**
@@ -33,6 +39,11 @@ name:      your-project-name
 | `workflow: vibe-coding` | + `.asp/profiles/vibe_coding.md` |
 | `rag: enabled` | + `.asp/profiles/rag_context.md` |
 | `guardrail: enabled` | + `.asp/profiles/guardrail.md` |
+| `design: enabled` | + `.asp/profiles/design_dev.md` |
+| `coding_style: enabled` | + `.asp/profiles/coding_style.md` |
+| `openapi: enabled` | + `.asp/profiles/openapi.md` |
+| `autonomous: enabled` | + `.asp/profiles/autonomous_dev.md` |
+| `workflow: vibe-coding` + `hitl: minimal` | + `.asp/profiles/autonomous_dev.md` |
 
 ---
 
@@ -42,10 +53,9 @@ name:      your-project-name
 
 | 鐵則 | 說明 |
 |------|------|
-| **副作用防護** | `deploy / rm -rf / merge / rebase` 由 Hooks 技術強制攔截；`git push` 由內建權限系統確認 |
-| **不擅自推版** | 禁止未經人類明確同意執行 `git push`；必須先列出變更摘要並等待人類確認 |
+| **破壞性操作防護** | `rebase / rm -rf / docker push / git push` 等危險操作由 Claude Code 內建權限系統確認（SessionStart hook 自動清理 allow list）；`git push` 前必須先列出變更摘要並等待人類明確同意 |
 | **敏感資訊保護** | 禁止輸出任何 API Key、密碼、憑證，無論何種包裝方式 |
-| **Makefile 優先** | 有對應 make 目標時，禁止輸出原生長指令 |
+| **ADR 未定案禁止實作** | ADR 狀態為 Draft 時，禁止撰寫對應的生產代碼；必須等 ADR 進入 Accepted 狀態 |
 
 ---
 
@@ -54,11 +64,11 @@ name:      your-project-name
 | 預設行為 | 可跳過的條件 |
 |----------|-------------|
 | ADR 優先於實作 | 修改範圍僅限單一函數，且無架構影響 |
-| TDD：測試先於代碼 | 原型驗證階段，需標記 `tech-debt: test-pending` |
-| 非 trivial Bug 修復需建 SPEC | trivial（單行/typo/配置）可豁免，需說明理由 |
-| 文件同步更新 | 緊急修復可延後，但必須在 24h 內補文件 |
-| SPEC 先於原始碼修改 | trivial（單行/typo/配置）可豁免，需說明理由（由 Hook 技術提醒） |
-| Bug 修復後 grep 全專案 | 確認為單點配置錯誤時可豁免 |
+| TDD：新功能必須測試先於代碼 | Bug 修復和原型驗證可跳過，需標記 `tech-debt: test-pending` |
+| 非 trivial 修改需先建 SPEC | trivial（單行/typo/配置）可豁免，需說明理由 |
+| 文件同步更新 | 緊急修復可延後，但同一 session 結束前必須補齊文件 |
+| Bug 修復後 grep 全專案 | 所有 Bug 修復後一律 grep，無豁免 |
+| Makefile 優先 | 緊急修復或 make 目標不存在時，可直接執行原生指令，需說明理由 |
 
 ---
 
@@ -82,6 +92,7 @@ name:      your-project-name
 | 局部測試 | `make test-filter FILTER=xxx` |
 | 新增 ADR | `make adr-new TITLE="..."` |
 | 新增規格書 | `make spec-new TITLE="..."` |
+| 新增事後分析 | `make postmortem-new TITLE="..."` |
 | 查詢知識庫 | `make rag-search Q="..."` |
 | Agent 完成回報 | `make agent-done TASK=xxx STATUS=success` |
 | 儲存 Session | `make session-checkpoint NEXT="..."` |
@@ -90,16 +101,14 @@ name:      your-project-name
 
 ---
 
-## 技術執行層（Hooks）
+## 技術執行層（Hooks + 內建權限）
 
-ASP 使用 Claude Code Hooks 技術強制執行鐵則，不依賴 AI 自律：
+ASP 使用 Claude Code 內建權限系統 + SessionStart Hook 保護危險操作：
 
-| Hook | 攔截對象 | 行為 |
-|------|---------|------|
-| `enforce-side-effects.sh` | deploy, rm -rf, merge, rebase, kubectl, docker push | deny 阻止執行，告知原因 |
-| `enforce-workflow.sh` | 原始碼修改（Edit/Write） | 依 HITL 等級 deny 攔截 + SPEC 存在性檢查 |
+| 機制 | 說明 |
+|------|------|
+| **內建權限系統** | 危險指令（git push/rebase, docker push, rm -rf 等）不在 allow list 中時，Claude Code 自動彈出「Allow this bash command?」確認框 |
+| **SessionStart Hook** | `clean-allow-list.sh` 每次 session 啟動時自動清理 allow list 中的危險規則，確保內建權限系統持續生效 |
 
-> Hooks 使用 `permissionDecision: "deny"` + `exit 2` 雙保險攔截（[GitHub #3514](https://github.com/anthropics/claude-code/issues/3514)）。
-> `git push` 不由 hook 攔截，改由 Claude Code 內建權限系統處理（VSCode 中顯示 GUI 確認框）。
-> 原因：hook `"ask"` 在 VSCode 中被忽略（[#13339](https://github.com/anthropics/claude-code/issues/13339)），`"deny"` 會截斷對話。
 > 設定檔位於 `.claude/settings.json`，hook 腳本位於 `.asp/hooks/`。
+> 使用者可在確認框中選擇 "Allow"（一次性）或 "Always allow"（永久），但後者會在下次 session 啟動時被自動清理。

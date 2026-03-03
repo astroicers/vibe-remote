@@ -1,5 +1,8 @@
 # Vibe Coding — 規格驅動開發策略
 
+<!-- requires: global_core -->
+<!-- optional: autonomous_dev (when hitl: minimal) -->
+
 適用：以「AI 餵食者 + 品質守門員」角色最大化輸出效率。
 載入條件：`workflow: vibe-coding`
 
@@ -39,33 +42,97 @@
 ## HITL 等級與暫停決策
 
 ```yaml
-hitl: minimal   # 僅副作用前暫停（適合熟悉任務）
+hitl: minimal   # 明確定義的暫停觸發條件（見下方清單）
 hitl: standard  # 每個實作計畫需確認（預設）
 hitl: strict    # 每個檔案修改需確認（涉及生產/安全系統）
 ```
 
 ```
-FUNCTION should_pause(file_path, operation, hitl_level):
+FUNCTION should_pause(operation, hitl_level):
 
-  category = classify(file_path)
+  // ─── 鐵則級暫停（所有 HITL 等級都觸發）───
+  // 由 Claude Code 內建權限系統確認：
+  // git rebase, docker push/deploy, rm -r*, find -delete, git push
 
-  // 無條件暫停 — 任何 HITL 等級
-  UNCONDITIONAL_PAUSE = [
-    category == "sensitive",          // auth / crypto 相關模組
-    category == "interface",          // 共用介面或 API 合約
-    operation == "delete_existing",   // 刪除現有代碼（非新增）
-    operation IN ["tag", "publish"]   // 版本發布
-  ]
-  IF ANY(UNCONDITIONAL_PAUSE): RETURN MUST_ASK
+  // ─── 檔案修改 — 依 HITL 等級（AI 自律）───
+  MATCH hitl_level:
+    "minimal":
+      // 暫停條件（明確列舉，非模糊的「信任 AI」）：
+      PAUSE_WHEN:
+        - operation.deletes_file()                          // 刪除檔案
+        - operation.adds_external_dependency()              // 新增外部依賴
+        - operation.modifies_db_schema() AND NOT spec.covers_schema_change()
+        - operation.scope_exceeds_current_spec()            // 超出 SPEC 範圍
+        - operation.auto_fix_retries >= 3                   // Bug 修復連續失敗
+      OTHERWISE:
+        RETURN PASS  // 在 SPEC 範圍內的所有操作自主執行
 
-  // 條件暫停 — 依 HITL 等級
-  MATCH (category, hitl_level):
-    ("source", "standard") → RETURN ASK
-    ("source", "strict")   → RETURN ASK
-    ("test",   "strict")   → RETURN ASK
-    ("doc",    "strict")   → RETURN ASK
-    _                      → RETURN PASS
+    "standard":
+      RETURN ASK    // 每個實作計畫需確認
+
+    "strict":
+      RETURN MUST_ASK  // 每個檔案修改需確認
 ```
+
+### minimal 模式行為規範
+
+`hitl: minimal` 不是「無限制」，而是「精確限制」：
+
+| AI 可自主做 | AI 必須暫停 |
+|-------------|-------------|
+| 建立/修改 SPEC 範圍內的檔案 | 刪除任何非暫存檔案 |
+| 跟隨既有 pattern 做命名/結構決策 | 新增 pyproject.toml / package.json 依賴 |
+| `make test` 失敗後自動修復（≤3次） | 修改 DB schema（除非 SPEC 明確指定）|
+| 建立新 SPEC（前提：ADR 已 Accepted） | 發現需求超出 SPEC/版本範圍 |
+| 更新文件（ROADMAP、README、CHANGELOG） | git push / rebase（鐵則） |
+
+**自動修復上限**：同一測試失敗連續修復 3 次仍未通過 → 暫停並向人類報告失敗細節。
+
+---
+
+## Context 管理
+
+長 session 的 context 會衰退，優化原則：**tokens-per-task（完成任務的總消耗）比 tokens-per-request 更重要**。
+
+**壓縮觸發**：context 使用率 > 70% 或對話超過 50 回合時，執行 `make session-checkpoint` 並產出結構化摘要：
+
+```
+Session Intent:    本次 session 的目標
+Files Modified:    已修改的檔案清單
+Decisions Made:    已做的設計/架構決策
+Current State:     目前進度與阻塞點
+Next Steps:        下一步行動
+```
+
+**衰退信號辨識**：出現以下情況表示 context 正在衰退，應立即觸發壓縮：
+
+| 模式 | 信號 |
+|------|------|
+| 中段遺忘（lost-in-middle） | AI 忽略對話中段的指令或決策 |
+| 資訊汙染（poisoning） | AI 依據錯誤/過時的 context 行動 |
+| 干擾（distraction） | AI 被無關資訊帶偏，偏離任務目標 |
+| 矛盾（clash） | AI 在矛盾指令間擺盪，輸出不一致 |
+
+**應對**：偵測到任一信號 → `make session-checkpoint NEXT="..."` → 開新 session 或要求 AI 重讀 CLAUDE.md。
+
+### 主動預防（不等衰退再反應）
+
+上述為「偵測到衰退後的反應」，以下為「預防衰退的主動措施」：
+
+1. **定期壓縮**：每 30 回合主動執行 `make session-checkpoint`，不等 70% 閾值
+   - autonomous 模式下，每完成一個 Stage 也是壓縮時機
+
+2. **Context 品質自驗**：Stage 完成時，AI 重述當前 SPEC 的 Goal 和 Done When
+   - 重述準確 → 繼續
+   - 重述不完整或偏差 → context 已不可信 → 從檔案系統重新讀取 SPEC 再繼續
+   - 無法重述 → 立即 checkpoint + 新 session
+
+3. **不可跨 session 繼承的資訊**（新 session 必須從檔案系統重新讀取）：
+   - ADR 狀態（可能已在其他 session 中變更）
+   - 測試基線（`make test` 結果可能已過時）
+   - 架構圖（`docs/architecture.md` 可能已更新）
+   - 依賴版本（lock file 可能已變更）
+   - 其他人的 commit（git log 可能有新變更）
 
 ---
 
@@ -77,8 +144,6 @@ FUNCTION should_pause(file_path, operation, hitl_level):
 切換前：摘要目前狀態（完成了什麼、未完成什麼）
 切換後：讀取新模組的 ADR → 確認測試基線通過
 ```
-
-長對話管理：超過 50 回合的對話，重新讀取 CLAUDE.md。
 
 ---
 

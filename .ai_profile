@@ -1,10 +1,14 @@
 type: system
-mode: single
-workflow: standard
+mode: committee
+workflow: vibe-coding
 rag: disabled
 guardrail: disabled
-hitl: standard
+hitl: minimal
 name: vibe-remote
 spec_required: all_code_changes
 spec_exceptions: docs_only, single_line_config, claude_md_update
 hotfix_policy: implement_first_then_retroactive_spec_same_session
+autonomous: enabled
+design: disabled
+coding_style: disabled
+openapi: disabled

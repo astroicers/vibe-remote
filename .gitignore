@@ -63,3 +63,4 @@ docs/session-log.md
 CLAUDE.md.pre-upgrade
 .asp-tmp/
 *.out
+*.zip
