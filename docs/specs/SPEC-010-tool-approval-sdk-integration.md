@@ -138,6 +138,13 @@ if (config.TOOL_APPROVAL_ENABLED) {
 - `client/src/components/chat/ToolApprovalCard.tsx` — UI 審批卡片
 - WS 事件：`tool_approval_request`, `tool_approval_response`
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| `canUseTool` callback 注入 runner | ToolApprovalStore 狀態 | WS 廣播 `tool_approval_request` 事件 |
+| `bypassPermissions` 模式切換 | Runner permission model | Feature flag 控制兩種模式互斥 |
+
 ---
 
 ## 邊界條件（Edge Cases）
@@ -148,6 +155,12 @@ if (config.TOOL_APPROVAL_ENABLED) {
 - **多裝置連線**：WS 廣播到所有已認證 client，任一裝置可回應
 - **Bypass 模式衝突**：當 `canUseTool` 啟用時，必須移除 `bypassPermissions` 才能讓 SDK 觸發 callback
 - **Runner abort 期間**：runner abort 會終止整個執行，pending approval 的 Promise 自然 reject
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit
+- **不可逆評估**：無不可逆變更，Feature flag 預設 disabled
+- **資料影響**：無，不影響現有使用者
 
 ---
 

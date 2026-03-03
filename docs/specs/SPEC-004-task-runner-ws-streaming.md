@@ -484,6 +484,13 @@ useEffect(() => {
 }, []);
 ```
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| Task 執行進度透過 WS 即時廣播 | TasksPage 列表即時更新 | task_progress / task_complete 事件驅動 UI |
+| Runner output 串流至 client | TaskCard 顯示 AI 輸出 | 逐 chunk 渲染，非一次性載入 |
+
 ---
 
 ## 邊界條件（Edge Cases）
@@ -496,6 +503,12 @@ useEffect(() => {
 - **Timer 未清除：** `flushTimer` 使用 `setTimeout`，在 runner.run() 結束後（無論成功或失敗）都會呼叫 `flushTextBuffer()` 清除。若 process 意外中斷，timer 自然被 GC。
 - **tool_use 的 input 含敏感資訊（如 file content）：** 使用 `truncateForHistory()` 截斷大型 input，避免 WS 訊息超過合理大小。Bash 指令的 `command` 欄位不截斷（通常較短），但 Write/Edit 的 `content`/`new_string` 截斷至 500 字元。
 - **onEvent callback 為 undefined（向後相容）：** `runTask()` 的 `onEvent` 參數為可選。不傳入時行為與修改前完全一致——runner 不掛載 event listener，不發送任何 WS 事件。
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit
+- **不可逆評估**：無不可逆變更
+- **資料影響**：無，task 仍可執行但前端回退為 polling 或手動刷新
 
 ---
 

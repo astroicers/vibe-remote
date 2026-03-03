@@ -126,6 +126,13 @@
   - Toggle：「Auto create branch」（預設開啟）
   - 可選 input：自訂 branch 名稱
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| Task 執行時自動切換 Git branch | Diff Review (`GET /diff/current`) | 顯示 task branch vs 原分支差異 |
+| `git stash` 暫存工作區變更 | 使用者未提交的程式碼 | Task 完成/失敗後透過 `stash pop` 恢復 |
+
 ---
 
 ## 邊界條件（Edge Cases）
@@ -136,6 +143,12 @@
 - **並發 task 時（未來支援多 runner）**：每個 task 各自 stash + checkout，simple-git 操作需加 workspace-level lock（Phase 2+ 議題）
 - **Branch 名稱過長**：截取 slug 至 40 字元，總長度不超過 100 字元
 - **空 title 產生空 slug**：fallback 使用 `task/<task_id_short>`
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit
+- **不可逆評估**：無不可逆變更（`branch` 欄位已存在於 DB schema）
+- **資料影響**：無，回退後 task 恢復無 branch 行為
 
 ---
 

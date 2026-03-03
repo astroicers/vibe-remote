@@ -256,6 +256,13 @@ export const models = {
   - opus：星星 icon（現有）
 - 選中狀態邏輯不變（比較 `settings.model === model.key`）
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| 使用者選擇的 model 影響 runner 建立 | Chat handler (`createRunner`) | 使用指定 model ID 建立 Claude runner |
+| Settings 頁面新增 model selector | SettingsPage 儲存邏輯 | model 設定持久化至 localStorage |
+
 ---
 
 ## 邊界條件（Edge Cases）
@@ -267,6 +274,12 @@ export const models = {
 - **Server 無 CLAUDE_MODEL env**：`config.ts` 已有 default `'claude-sonnet-4-20250514'`，`resolveModelId()` 呼叫 `config.CLAUDE_MODEL` 永遠有值
 - **並行 chat 使用不同模型**：每次 WS message 攜帶獨立 model key，各 runner 各自解析，互不影響
 - **Model ID 版本更新**：只需修改 `server/src/ai/models.ts` 中的 `MODELS` 陣列，所有 client 自動生效（透過 API）
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit
+- **不可逆評估**：無不可逆變更
+- **資料影響**：無，回退至環境變數 `CLAUDE_MODEL` 單一設定（localStorage 可清除）
 
 ---
 

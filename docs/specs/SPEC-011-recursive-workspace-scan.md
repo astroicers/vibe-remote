@@ -55,6 +55,13 @@
 | 路徑不存在 | 404 | PATH_NOT_FOUND |
 | 掃描失敗 | 500 | SCAN_ERROR |
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| Workspace 列表包含子目錄 Git repos | ReposPage workspace 選擇器 | 自動發現巢狀 Git 專案 |
+| 掃描結果快取於記憶體 | Server 啟動時間 | 首次掃描可能增加 100-500ms |
+
 ---
 
 ## 邊界條件（Edge Cases）
@@ -64,6 +71,12 @@
 - Case 3：找到 `.git` 後不繼續往下（不掃描 git submodule）
 - Case 4：隱藏目錄（`.` 開頭） → 跳過
 - Case 5：達到 maxDepth → 停止遞迴
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit
+- **不可逆評估**：無不可逆變更
+- **資料影響**：無，回退至手動設定 workspace 路徑
 
 ---
 

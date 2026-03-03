@@ -174,6 +174,14 @@ abortConversation: (id: string) =>
 - 點擊後呼叫 `chatApi.abortConversation(currentConversationId)`
 - 成功時顯示 toast「AI processing aborted」
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| Runner 超時自動中止 | Chat 頁面狀態指示器 | 顯示 "timeout" 而非持續 "thinking" |
+| Stale runner 被定期清理 | ActiveRunners Map | 防止 orphan runner 佔用並行額度 |
+| REST abort endpoint 新增 | Chat API 路由 | `POST /api/chat/abort` 可手動中止 |
+
 ---
 
 ## 邊界條件（Edge Cases）
@@ -183,6 +191,12 @@ abortConversation: (id: string) =>
 - **Stale cleanup 與 withTimeout race**：兩者都安全——abort 已經被移除的 runner 是 no-op
 - **Task runner timeout**：emit `task_complete` with `status: 'failed'`，task 狀態正確更新
 - **WS 斷線後 abort**：REST endpoint 不依賴 WS 連線，可獨立操作
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit
+- **不可逆評估**：無不可逆變更
+- **資料影響**：無，runner 不再自動超時（可能導致 orphan），需手動重啟 server 清理
 
 ---
 

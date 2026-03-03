@@ -213,6 +213,13 @@ if (!readyTask) return;
 - `Task` interface 新增 `dependencyStatus?: 'ready' | 'waiting' | 'blocked'`
 - 確認 `dependsOn` 已定義為 `string[]`（已存在）
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| Task 新增 `depends_on` 關聯 | Task Queue 排程 (`processNext`) | 依賴未完成的 task 不會被排入執行 |
+| 依賴 task 狀態變更 | 被依賴的 task 完成通知 | 自動檢查下游 task 是否可執行 |
+
 ---
 
 ## 邊界條件（Edge Cases）
@@ -224,6 +231,12 @@ if (!readyTask) return;
 - **依賴 task 狀態為 `awaiting_review`**：算 `waiting`，需 approve 並完成後才會解鎖下游
 - **新增依賴到已執行中的 task**：不允許修改 `running` 狀態 task 的 `dependsOn`
 - **空陣列 `[]` vs `null`**：兩者皆視為「無依賴」，`dependencyStatus = ready`
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit
+- **不可逆評估**：無不可逆變更，DB `depends_on` 欄位為 nullable
+- **資料影響**：無，回退後 task 恢復獨立排程
 
 ---
 

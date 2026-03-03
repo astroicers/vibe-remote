@@ -43,6 +43,13 @@
 - Token 已過期時，清晰的中文 toast 告知使用者需重新配對
 - WS 連線中 token 過期，同樣有清晰的錯誤提示
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| 401 回應觸發自動登出 | 所有 API 呼叫點 | Token 過期時清除 auth state 並導向登入 |
+| Silent token renewal | WS 連線 | Token 更新後 WS 自動重連 |
+
 ---
 
 ## 邊界條件（Edge Cases）
@@ -53,6 +60,12 @@
 - Case 4：冷啟動無 token → `checkAuth()` 失敗但不顯示 toast
 - Case 5：WS 連線中 token 過期 → `auth_expired` 事件 + toast + logout
 - Case 6：裝置被管理員刪除 → 401 DEVICE_REVOKED + 對應 toast
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit
+- **不可逆評估**：無不可逆變更
+- **資料影響**：無，回退至手動處理 401（使用者需手動重新登入）
 
 ---
 

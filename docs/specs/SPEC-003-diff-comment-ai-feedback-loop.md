@@ -319,6 +319,13 @@ export type WSEventType =
   | 'feedback:complete';
 ```
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| Comment 觸發 AI runner 產生修改建議 | Chat 頁面訊息流 | AI 回覆出現在對應 conversation 中 |
+| Diff review 狀態可能因 AI 修改而更新 | DiffPage file list | 新修改的檔案出現在 diff 列表 |
+
 ---
 
 ## 邊界條件（Edge Cases）
@@ -333,6 +340,12 @@ export type WSEventType =
 - **短時間內多次送 feedback（同一 review）：** 因為 runner per-conversation lock，第二次會被 409 擋住。
 - **原 review 已被 reject（files discarded）：** 如果 `rejectAll()` 已執行 `discardChanges()`，工作目錄已回到 clean 狀態。此時 AI 會基於 clean 狀態重新撰寫程式碼。feedback prompt 應明確告知 AI「之前的變更已被丟棄，請重新實作以下需求」。
   - **偵測方式：** 檢查 `review.status === 'rejected'`，若是，在 prompt 前加上：`"Note: The previous changes were discarded. Please re-implement the changes addressing the following feedback:"`
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit
+- **不可逆評估**：無不可逆變更，comment 資料保留但不再觸發 AI
+- **資料影響**：無，既有 comment 不受影響
 
 ---
 

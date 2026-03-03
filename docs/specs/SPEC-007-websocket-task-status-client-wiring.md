@@ -156,6 +156,13 @@ export function useTaskWebSocket(): void {
 | `client/src/stores/chat.ts` | `diff_ready` 已在此處監聽（line 193），不需要另外處理 |
 | `client/src/stores/diff.ts` | `files_changed` 暫不需要 wire — diff store 使用 REST polling（Phase 2 再考慮） |
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| TaskStore 接收 WS 事件更新 task 狀態 | TasksPage 列表 | 無需手動刷新即可看到最新狀態 |
+| WS 事件觸發 toast 通知 | 全域通知系統 | task 完成/失敗時顯示 toast |
+
 ---
 
 ## 邊界條件（Edge Cases）
@@ -166,6 +173,12 @@ export function useTaskWebSocket(): void {
 4. **同一 task 的多次快速狀態更新**（例如 pending → running → completed）：每次更新都是完整 task 物件替換（非 patch），不會遺失中間狀態
 5. **WS 重連後遺失事件**：WS 重連期間的事件會丟失，但 `TasksPage` 的 `useEffect` 在 workspace 切換時會 `loadTasks()` 重新拉取，最終一致性可接受
 6. **Toast 堆疊**：toast store 已有 `MAX_TOASTS = 3` 限制，多個 task 同時完成不會溢出
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit
+- **不可逆評估**：無不可逆變更
+- **資料影響**：無，task 狀態改為手動刷新取得
 
 ---
 

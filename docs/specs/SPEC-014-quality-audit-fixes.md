@@ -57,6 +57,15 @@
 - Client 有 ErrorBoundary 防白屏
 - Settings 載入錯誤有 console.warn
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| JSON.parse 增加保護 | GET /conversations API | 無效 JSON 回傳預設值而非 crash |
+| setInterval 清理 | Server 記憶體管理 | 防止 interval leak |
+| DB indices 新增 | 查詢效能 | 常用查詢加速 |
+| ErrorBoundary 新增 | Client 全域錯誤處理 | 元件崩潰時顯示 fallback UI |
+
 ---
 
 ## 邊界條件（Edge Cases）
@@ -64,6 +73,12 @@
 - Case 1：tool_calls JSON 損壞 → fallback 為純文字 content
 - Case 2：SIGTERM 時 setInterval 正確清理
 - Case 3：SQLite busy → 等待 5s 後 retry
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit
+- **不可逆評估**：DB indices 已建立（需手動 `DROP INDEX`），其餘為防禦性修改可安全回退
+- **資料影響**：無，indices 刪除後僅影響查詢效能，不影響資料完整性
 
 ---
 

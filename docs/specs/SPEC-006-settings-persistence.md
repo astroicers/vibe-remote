@@ -259,6 +259,13 @@ export const settings = {
 - 當 auth token 存在且有效時，呼叫 `useSettingsStore.getState().loadFromServer()`
 - 確保只在認證成功後觸發，避免 401 錯誤
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| 新增 `device_settings` DB 表 | Auth middleware（device 識別） | per-device 設定隨認證自動載入 |
+| Settings 從 localStorage 遷移至 server | SettingsPage 載入/儲存 | 首次同步時 localStorage 值優先 |
+
 ---
 
 ## 邊界條件（Edge Cases）
@@ -272,6 +279,12 @@ export const settings = {
 - **settings key 未知（未來擴展）**：Server 不驗證 key 是否在已知列表中，允許 client 自由儲存新 key（前向相容）
 - **value 為空字串**：合法——空字串代表「已設定但值為空」，與「從未設定」（key 不存在）語意不同
 - **`projectsPath` 含特殊字元**：value 儲存為 TEXT，不做路徑驗證（server 不關心路徑語意，僅存文字）
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit + migration DOWN（DROP TABLE device_settings）
+- **不可逆評估**：無不可逆變更，DB 表可安全刪除
+- **資料影響**：回退至 localStorage-only，使用者不會丟失設定（localStorage 仍在）
 
 ---
 

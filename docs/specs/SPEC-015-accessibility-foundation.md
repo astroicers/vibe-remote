@@ -49,10 +49,24 @@
 
 ---
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| 無跨模組影響 | — | 僅修改 UI 元件的 ARIA 屬性和樣式 |
+
+---
+
 ## 邊界條件（Edge Cases）
 
 - Focus trap 在 container 內無可聚焦元素時不應 crash
 - `prefers-reduced-motion: reduce` 應保留 `0.01ms` 而非 `0ms`（避免 animationend 事件失效）
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit
+- **不可逆評估**：無不可逆變更，純 UI 修改
+- **資料影響**：無
 
 ---
 

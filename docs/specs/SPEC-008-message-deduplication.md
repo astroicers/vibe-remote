@@ -72,6 +72,12 @@ function addMessageIfNotExists(messages: ChatMessage[], msg: ChatMessage): ChatM
 - `chat_complete` handler 中的 assistant message 加入
 - `sendMessage()` 中的 optimistic user message 加入
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| 無跨模組影響 | — | 修復僅限 ChatStore 內部邏輯 |
+
 ---
 
 ## 邊界條件（Edge Cases）
@@ -80,6 +86,12 @@ function addMessageIfNotExists(messages: ChatMessage[], msg: ChatMessage): ChatM
 - **WS 重連**：`wsHandlersInitialized` 為 module-level，重連時不會重複註冊
 - **多 workspace**：去重以 `message.id` 為 key，不同 workspace 的訊息 ID 不同，互不影響
 - **瀏覽器 tab 重新載入**：module-level flag 隨 JS context 重置，正常重新註冊
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit
+- **不可逆評估**：無不可逆變更
+- **資料影響**：無，StrictMode 下訊息可能重複顯示但不影響資料正確性
 
 ---
 

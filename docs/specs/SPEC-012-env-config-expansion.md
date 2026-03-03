@@ -41,6 +41,13 @@
 
 所有新環境變數都有合理預設值，不設定任何新 env 時行為與改動前完全一致。
 
+## 🔗 副作用與連動（Side Effects）
+
+| 本功能的狀態變動 | 受影響的既有功能 | 預期行為 |
+|-----------------|----------------|---------|
+| 新增環境變數 | Server config / Zod schema | `.env` 缺少新變數時使用預設值 |
+| Docker compose 新增 env mapping | `docker-compose.yml` | 需同步更新部署文件 |
+
 ---
 
 ## 邊界條件（Edge Cases）
@@ -49,6 +56,12 @@
 - Case 2：`CORS_ORIGIN=*` → `cors({ origin: true })`，等同原本的 `cors()`
 - Case 3：`CORS_ORIGIN=https://app.example.com,https://admin.example.com` → 多來源陣列
 - Case 4：測試環境 mock config → 需補齊新欄位
+
+### 回退方案（Rollback Plan）
+
+- **回退方式**：revert commit
+- **不可逆評估**：無不可逆變更，新環境變數均有預設值
+- **資料影響**：無，不影響既有部署
 
 ---
 
