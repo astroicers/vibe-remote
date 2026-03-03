@@ -66,6 +66,14 @@ AI 回應需要即時串流（逐字顯示），tool 使用需要即時通知，
 - [x] Pending message queue（連線恢復後重送）
 - [ ] WebSocket heartbeat / ping-pong 機制
 
+## 成功指標（Success Metrics）
+
+| 指標 | 目標值 | 驗證方式 | 檢查時間 |
+|------|--------|----------|----------|
+| Rate limiting 生效 | 超過 10 msg/min 時拒絕 | 單元測試 | 已驗證 |
+| Reconnect backoff 上限 | 最多 5 次，1s → 16s | Code review | 已驗證 |
+| 斷線期間訊息不丟失 | Pending queue 於重連後送出 | 手動測試 | 已驗證 |
+
 ---
 
 ## 關聯（Relations）

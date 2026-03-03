@@ -64,6 +64,16 @@
 
 ---
 
+## 成功指標（Success Metrics）
+
+| 指標 | 目標值 | 驗證方式 | 檢查時間 |
+|------|--------|----------|----------|
+| StrictMode 下無重複訊息 | 同一訊息只出現一次 | dev mode 手動測試 | 已驗證 |
+| Module-level guard 生效 | `setupWSHandlers` 只執行一次 | Code review | 已驗證 |
+| ID-based dedup 效能 | 200 筆下 < 1ms | O(n) 確認 | 已驗證 |
+
+---
+
 ## 關聯（Relations）
 
 - 取代：無

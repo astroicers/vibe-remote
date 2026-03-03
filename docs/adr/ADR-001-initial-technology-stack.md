@@ -66,6 +66,15 @@ Vibe Remote 是一個 mobile-first PWA，讓工程師在通勤時用手機透過
 - [x] Phase 1 MVP 驗證技術棧可行性
 - [ ] 若用戶數超過 5 人，評估是否遷移至 PostgreSQL
 
+## 成功指標（Success Metrics）
+
+| 指標 | 目標值 | 驗證方式 | 檢查時間 |
+|------|--------|----------|----------|
+| 外部服務依賴數 | 0（無 Redis/PostgreSQL/MQ） | `docker-compose.yml` 檢查 | 已驗證 |
+| 前後端共用型別 | `shared/types.ts` 被雙方引用 | `grep -r "shared/types" server/ client/` | 已驗證 |
+| Docker 單容器部署 | Health check 通過 | `curl localhost:8080/api/health` | 已驗證 |
+| 全專案測試通過率 | 100% | `npm test` server + client | 已驗證（330 tests） |
+
 ---
 
 ## 關聯（Relations）

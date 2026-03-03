@@ -69,6 +69,16 @@
 
 ---
 
+## 成功指標（Success Metrics）
+
+| 指標 | 目標值 | 驗證方式 | 檢查時間 |
+|------|--------|----------|----------|
+| Per-conversation lock 生效 | 同一 conversation 拒絕重複執行 | 單元測試 | 已驗證 |
+| 全域並行上限 | 超過 MAX=3 時回傳錯誤 | 單元測試 | 已驗證 |
+| 斷線自動清理 runner | WS disconnect 後 Map size 歸零 | 測試 | 已驗證 |
+
+---
+
 ## 關聯（Relations）
 
 - 取代：（無）

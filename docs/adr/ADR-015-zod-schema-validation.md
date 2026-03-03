@@ -61,6 +61,14 @@
 - [x] 環境變數 zod schema
 - [x] 所有 API route 使用 zod 驗證
 
+## 成功指標（Success Metrics）
+
+| 指標 | 目標值 | 驗證方式 | 檢查時間 |
+|------|--------|----------|----------|
+| 環境變數缺失時啟動失敗 | 缺少 `JWT_SECRET` 時 exit(1) | 單元測試 | 已驗證 |
+| API route 使用 Zod 驗證 | 無 `req.body` 直接使用 | Code search | 已驗證 |
+| 錯誤回傳統一格式 | `{ error, code }` 結構 | API 測試 | 已驗證 |
+
 ---
 
 ## 關聯（Relations）

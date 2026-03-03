@@ -66,6 +66,15 @@
 - [x] Volumes：`vibe-data`（DB）、`~/.claude`（credentials）、workspace mount
 - [ ] 評估預編譯 TS → JS 減少 runtime 依賴
 
+## 成功指標（Success Metrics）
+
+| 指標 | 目標值 | 驗證方式 | 檢查時間 |
+|------|--------|----------|----------|
+| Runtime image 無 build tools | python3/make/g++ 不在 runtime | `docker run --rm vibe-remote which python3` | 已驗證 |
+| 非 root 執行 | container 以 `node` user 運行 | `docker exec ... whoami` | 已驗證 |
+| Health check 通過 | `/api/health` 回傳 200 | `docker compose ps` | 已驗證 |
+| 三階段建構 | Dockerfile 含 3 個 `FROM` | `grep -c "^FROM" server/Dockerfile` = 3 | 已驗證 |
+
 ---
 
 ## 關聯（Relations）

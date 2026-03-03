@@ -59,6 +59,14 @@ Shared types 透過 TypeScript `paths` alias 引用：`../../shared/types.ts`。
 - [x] Root dev script 使用 concurrently
 - [x] shared/types.ts 透過相對路徑共用
 
+## 成功指標（Success Metrics）
+
+| 指標 | 目標值 | 驗證方式 | 檢查時間 |
+|------|--------|----------|----------|
+| server/client 各有獨立 package.json | 2 個獨立 `package.json` | 檔案結構 | 已驗證 |
+| `npm --prefix` 正常運作 | 可獨立 `npm ci` + `npm test` | CI 驗證 | 已驗證 |
+| shared types 透過相對路徑引用 | 無 workspace protocol | tsconfig 檢查 | 已驗證 |
+
 ---
 
 ## 關聯（Relations）

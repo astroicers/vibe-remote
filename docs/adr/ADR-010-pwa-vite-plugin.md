@@ -66,6 +66,14 @@ PWA 設定：
 - [x] API runtime caching
 - [ ] 完整離線模式（queue requests offline）
 
+## 成功指標（Success Metrics）
+
+| 指標 | 目標值 | 驗證方式 | 檢查時間 |
+|------|--------|----------|----------|
+| Manifest 正確產生 | 含 name/icons/shortcuts | Build 後 `dist/` 檢查 | 已驗證 |
+| Service Worker 註冊成功 | DevTools > Application > SW active | 手動測試 | 已驗證 |
+| 可加至主畫面 | installability criteria 通過 | Lighthouse PWA | 已驗證 |
+
 ---
 
 ## 關聯（Relations）

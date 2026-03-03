@@ -66,6 +66,14 @@
 - [x] CASCADE delete 已覆蓋所有 FK
 - [ ] Phase 2 評估是否需要 migration 框架
 
+## 成功指標（Success Metrics）
+
+| 指標 | 目標值 | 驗證方式 | 檢查時間 |
+|------|--------|----------|----------|
+| 同步 API 無 async 包裝 | `grep "await.*db\." server/src/` = 0 | Code search | 已驗證 |
+| WAL mode 啟用 | `journal_mode = WAL` | 啟動 log / PRAGMA 查詢 | 已驗證 |
+| CASCADE delete 覆蓋 | 所有 FK 含 `ON DELETE CASCADE` | DB schema 檢查 | 已驗證 |
+
 ---
 
 ## 關聯（Relations）

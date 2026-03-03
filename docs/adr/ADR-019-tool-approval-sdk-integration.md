@@ -97,6 +97,16 @@ runner.run() → SDK 呼叫 canUseTool(toolName, input, toolUseId)
 
 ---
 
+## 成功指標（Success Metrics）
+
+| 指標 | 目標值 | 驗證方式 | 檢查時間 |
+|------|--------|----------|----------|
+| `canUseTool` 正確注入 | 啟用時無 `bypassPermissions` | 單元測試 | 已驗證 |
+| Feature flag 預設關閉 | `TOOL_APPROVAL_ENABLED=false` | config 檢查 | 已驗證 |
+| Approval timeout | 2 分鐘後自動 deny | 測試或手動驗證 | 已驗證 |
+
+---
+
 ## 關聯（Relations）
 
 - 取代：無

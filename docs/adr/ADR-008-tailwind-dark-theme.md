@@ -68,6 +68,14 @@ Layout 設計：
 - [x] Safe area support
 - [ ] Light mode 主題（低優先）
 
+## 成功指標（Success Metrics）
+
+| 指標 | 目標值 | 驗證方式 | 檢查時間 |
+|------|--------|----------|----------|
+| CSS custom properties 完整定義 | `--bg-primary` 等全部存在 | CSS 檔案檢查 | 已驗證 |
+| Safe area 支援 | `env(safe-area-inset-*)` 使用於佈局 | `grep "safe-area" client/src/` | 已驗證 |
+| 無 CSS-in-JS runtime | `styled-components`/`emotion` 不在依賴 | package.json | 已驗證 |
+
 ---
 
 ## 關聯（Relations）

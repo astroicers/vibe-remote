@@ -69,6 +69,14 @@ WebSocket client 設計（`websocket.ts`）：
 - [x] WebSocket auto-reconnect
 - [ ] 評估是否需要 REST retry 機制
 
+## 成功指標（Success Metrics）
+
+| 指標 | 目標值 | 驗證方式 | 檢查時間 |
+|------|--------|----------|----------|
+| 無第三方 HTTP client | `axios`/`superagent` 不在依賴 | package.json | 已驗證 |
+| WebSocket auto-reconnect | 斷線後 16s 內重連 | 手動測試 | 已驗證 |
+| JWT 自動注入 | `request()` 含 Authorization header | Code review | 已驗證 |
+
 ---
 
 ## 關聯（Relations）

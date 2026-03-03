@@ -78,6 +78,16 @@
 
 ---
 
+## 成功指標（Success Metrics）
+
+| 指標 | 目標值 | 驗證方式 | 檢查時間 |
+|------|--------|----------|----------|
+| 超時自動 abort | 超過 timeout 後 conversation 解鎖 | 單元測試 | 已驗證 |
+| Stale cleanup 定期執行 | 60s interval 清理 1.5x 超時 runner | 測試 | 已驗證 |
+| REST abort endpoint | `POST /api/chat/abort` 回傳 200 | API 測試 | 已驗證 |
+
+---
+
 ## 關聯（Relations）
 
 - 取代：無

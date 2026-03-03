@@ -67,6 +67,14 @@ AI Engine 是本專案核心。需要 AI 能讀寫檔案、執行 bash 指令、
 - [ ] 待 SDK 修復 Docker session resume 後重新啟用
 - [ ] 評估 per-workspace model 切換 API 持久化
 
+## 成功指標（Success Metrics）
+
+| 指標 | 目標值 | 驗證方式 | 檢查時間 |
+|------|--------|----------|----------|
+| Streaming 即時到達 | 首 token < 3s | 手動測試 | 已驗證 |
+| EventEmitter 解耦 | Runner 不直接持有 WS 引用 | Code review | 已驗證 |
+| maxTurns 防護 | AI turn 數 ≤ 20 | 測試或日誌 | 已驗證 |
+
 ---
 
 ## 關聯（Relations）
