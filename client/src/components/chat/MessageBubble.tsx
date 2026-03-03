@@ -30,7 +30,7 @@ function MessageBubbleComponent({ role, content, isStreaming }: MessageBubblePro
               return (
                 <pre
                   key={i}
-                  className="my-2 p-3 bg-bg-primary rounded-lg overflow-x-auto text-xs font-mono"
+                  className="my-2 p-3 bg-bg-primary rounded-lg overflow-x-auto text-[13px] font-mono leading-relaxed border-l-2 border-accent/30"
                 >
                   {lang && (
                     <div className="text-text-muted text-xs mb-2">{lang}</div>

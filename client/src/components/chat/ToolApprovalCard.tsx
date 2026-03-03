@@ -38,7 +38,7 @@ function ToolApprovalCardComponent({
   };
 
   return (
-    <div className="mx-4 mb-3 p-4 bg-bg-secondary rounded-xl border border-border shadow-sm">
+    <div className="mx-4 mb-3 card-static">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">

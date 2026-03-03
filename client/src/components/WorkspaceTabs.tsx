@@ -63,7 +63,7 @@ export function WorkspaceTabs() {
 
             {/* Unread badge */}
             {unread > 0 && (
-              <span className="w-4 h-4 rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0">
+              <span className="badge-sm rounded-full flex items-center justify-center flex-shrink-0">
                 {unread > 9 ? '9+' : unread}
               </span>
             )}

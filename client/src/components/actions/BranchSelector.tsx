@@ -86,7 +86,7 @@ export function BranchSelector({ isOpen, onClose, workspaceId }: BranchSelectorP
             value={newBranchName}
             onChange={(e) => setNewBranchName(e.target.value)}
             placeholder="New branch name..."
-            className="flex-1 px-3 py-2.5 bg-bg-surface border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+            className="flex-1 px-3 py-2.5 bg-bg-surface border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-focus focus:shadow-glow min-h-[44px]"
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleCreateBranch();
             }}

@@ -142,7 +142,7 @@ export function ChatInput({
               </svg>
               Attach
               {selectedFileCount !== undefined && selectedFileCount > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.5 bg-accent text-white text-[10px] font-bold rounded-full leading-none">
+                <span className="ml-0.5 badge-accent rounded-full leading-none text-[10px]">
                   {selectedFileCount}
                 </span>
               )}
@@ -201,7 +201,7 @@ export function ChatInput({
           placeholder={placeholder}
           disabled={disabled}
           rows={1}
-          className="flex-1 min-h-[44px] max-h-[40vh] px-4 py-2.5 bg-bg-surface text-text-primary placeholder-text-muted border border-border rounded-2xl resize-none focus:outline-none focus:border-border-focus focus:ring-2 focus:ring-accent/30 disabled:opacity-50 text-[15px] leading-[1.4]"
+          className="flex-1 min-h-[44px] max-h-[40vh] px-4 py-2.5 bg-bg-surface text-text-primary placeholder-text-muted border border-border rounded-2xl resize-none focus:outline-none focus:border-border-focus focus:shadow-glow disabled:opacity-50 text-[15px] leading-[1.4]"
         />
 
         {/* Send / Voice morph button */}

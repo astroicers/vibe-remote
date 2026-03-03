@@ -26,7 +26,7 @@ function NavItem({ to, icon, label, badge }: NavItemProps) {
       <span className="relative">
         {icon}
         {badge !== undefined && badge > 0 && (
-          <span className="absolute -top-1 -right-2 w-5 h-5 bg-danger text-white text-[11px] font-medium rounded-full flex items-center justify-center">
+          <span className="absolute -top-1 -right-2 badge w-5 h-5 rounded-full flex items-center justify-center">
             {badge}
           </span>
         )}

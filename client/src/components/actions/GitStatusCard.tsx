@@ -11,7 +11,7 @@ interface GitStatusCardProps {
 export function GitStatusCard({ status, onRefresh, isLoading }: GitStatusCardProps) {
   if (!status) {
     return (
-      <div className="p-4 bg-bg-secondary rounded-2xl border border-border">
+      <div className="card-static">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-bg-tertiary rounded-lg flex items-center justify-center">
             <svg
@@ -38,7 +38,7 @@ export function GitStatusCard({ status, onRefresh, isLoading }: GitStatusCardPro
 
   if (!status.isGitRepo) {
     return (
-      <div className="p-4 bg-bg-secondary rounded-2xl border border-border">
+      <div className="card-static">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-warning/20 rounded-lg flex items-center justify-center">
             <svg
@@ -66,7 +66,7 @@ export function GitStatusCard({ status, onRefresh, isLoading }: GitStatusCardPro
   const hasChanges = !status.isClean;
 
   return (
-    <div className="p-4 bg-bg-secondary rounded-2xl border border-border">
+    <div className="card-static">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">

@@ -24,7 +24,7 @@ function TokenUsageCardComponent({ tokenUsage, onDismiss }: TokenUsageCardProps)
   const cacheTokens = tokenUsage.cacheReadTokens + tokenUsage.cacheCreationTokens;
 
   return (
-    <div className="mx-4 mb-3 p-3 bg-bg-secondary rounded-lg border border-border animate-fade-in">
+    <div className="mx-4 mb-3 card-static p-3 animate-fade-in">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <svg

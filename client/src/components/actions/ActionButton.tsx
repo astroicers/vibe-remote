@@ -30,7 +30,7 @@ export function ActionButton({
     <button
       onClick={onClick}
       disabled={disabled || loading}
-      className={`flex items-center gap-3 w-full p-3 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${variantStyles[variant]}`}
+      className={`relative overflow-hidden flex items-center gap-3 w-full p-3 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${variantStyles[variant]}`}
     >
       <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-bg-primary/50">
         {loading ? (
@@ -78,6 +78,12 @@ export function ActionButton({
           clipRule="evenodd"
         />
       </svg>
+
+      {loading && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-current/10">
+          <div className="h-full bg-current/40 animate-pulse" style={{ width: '60%' }} />
+        </div>
+      )}
     </button>
   );
 }
