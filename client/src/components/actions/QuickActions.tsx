@@ -102,7 +102,8 @@ export function QuickActions({ isOpen, onClose }: QuickActionsProps) {
           <h2 className="text-lg font-semibold text-text-primary">Quick Actions</h2>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-tertiary"
+            className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-bg-tertiary"
+            aria-label="Close quick actions"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

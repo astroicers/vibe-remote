@@ -172,7 +172,7 @@ export function ChatInput({
           <button
             onClick={() => setShowToolbar((prev) => !prev)}
             disabled={disabled}
-            className="relative w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-bg-tertiary text-text-secondary hover:bg-bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="relative w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-full bg-bg-tertiary text-text-secondary hover:bg-bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             aria-label={showToolbar ? 'Hide tools' : 'Show tools'}
             aria-expanded={showToolbar}
           >
@@ -210,7 +210,7 @@ export function ChatInput({
           <button
             onClick={toggleListening}
             disabled={disabled}
-            className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-danger text-white rounded-full hover:bg-danger/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-11 h-11 flex-shrink-0 flex items-center justify-center bg-danger text-white rounded-full hover:bg-danger/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             aria-label="Stop listening"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -222,7 +222,7 @@ export function ChatInput({
           <button
             onClick={handleSubmit}
             disabled={disabled}
-            className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-accent text-white rounded-full hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-11 h-11 flex-shrink-0 flex items-center justify-center bg-accent text-white rounded-full hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             aria-label="Send message"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -234,7 +234,7 @@ export function ChatInput({
           <button
             onClick={toggleListening}
             disabled={disabled}
-            className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-bg-tertiary text-text-secondary hover:bg-bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-full bg-bg-tertiary text-text-secondary hover:bg-bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             aria-label="Start voice input"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -247,7 +247,7 @@ export function ChatInput({
           <button
             onClick={handleSubmit}
             disabled
-            className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-accent text-white rounded-full opacity-50 cursor-not-allowed transition-colors"
+            className="w-11 h-11 flex-shrink-0 flex items-center justify-center bg-accent text-white rounded-full opacity-50 cursor-not-allowed transition-colors"
             aria-label="Send message"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">

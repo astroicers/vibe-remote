@@ -43,7 +43,8 @@ function TokenUsageCardComponent({ tokenUsage, onDismiss }: TokenUsageCardProps)
         </div>
         <button
           onClick={onDismiss}
-          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-bg-tertiary text-text-muted"
+          className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-bg-tertiary text-text-muted"
+          aria-label="Dismiss token usage"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
             <path

@@ -11,7 +11,7 @@ export function AttachButton({ onClick, disabled, selectedCount = 0 }: AttachBut
     <button
       onClick={onClick}
       disabled={disabled}
-      className="relative w-10 h-10 rounded-full flex items-center justify-center text-text-muted hover:text-accent hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      className="relative w-11 h-11 rounded-full flex items-center justify-center text-text-muted hover:text-accent hover:bg-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       aria-label="Attach files"
     >
       {/* Paperclip icon */}

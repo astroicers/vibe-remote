@@ -136,7 +136,8 @@ export function ReposPage() {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-bg-tertiary"
+          className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-bg-tertiary"
+          aria-label="Add workspace"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -157,7 +158,7 @@ export function ReposPage() {
       {error && (
         <div className="mx-4 mt-4 p-3 bg-danger/20 rounded-xl flex items-center justify-between flex-shrink-0">
           <span className="text-sm text-danger">{error}</span>
-          <button onClick={clearError} className="w-10 h-10 flex items-center justify-center text-danger hover:text-danger/80">
+          <button onClick={clearError} className="w-11 h-11 flex items-center justify-center text-danger hover:text-danger/80" aria-label="Dismiss error">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
               <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
             </svg>

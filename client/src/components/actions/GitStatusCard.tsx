@@ -89,7 +89,8 @@ export function GitStatusCard({ status, onRefresh, isLoading }: GitStatusCardPro
         <button
           onClick={onRefresh}
           disabled={isLoading}
-          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-bg-tertiary transition-colors disabled:opacity-50"
+          className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-bg-tertiary transition-colors disabled:opacity-50"
+          aria-label="Refresh git status"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

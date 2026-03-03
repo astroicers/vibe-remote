@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -19,6 +20,11 @@ export function ConfirmDialog({
   confirmLabel = 'Confirm',
   variant = 'default',
 }: ConfirmDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap
+  useFocusTrap(dialogRef, isOpen);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel();
@@ -39,11 +45,16 @@ export function ConfirmDialog({
       onClick={onCancel}
     >
       <div
+        ref={dialogRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        aria-describedby="confirm-dialog-message"
         className="bg-bg-elevated rounded-2xl p-6 max-w-sm w-full"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-base font-semibold text-text-primary">{title}</h2>
-        <p className="text-sm text-text-secondary mt-2">{message}</p>
+        <h2 id="confirm-dialog-title" className="text-base font-semibold text-text-primary">{title}</h2>
+        <p id="confirm-dialog-message" className="text-sm text-text-secondary mt-2">{message}</p>
         <div className="flex gap-3 mt-6">
           <button
             className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-bg-tertiary text-text-secondary hover:bg-bg-surface"

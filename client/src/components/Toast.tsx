@@ -58,6 +58,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
   return (
     <div
       ref={elementRef}
+      role="alert"
       data-testid={`toast-${toast.type}`}
       className={`${typeStyles[toast.type]} px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg pointer-events-auto max-w-[90vw] animate-slide-up flex items-center gap-2 transition-[transform,opacity] duration-150`}
       style={{ willChange: 'transform, opacity' }}
@@ -81,7 +82,7 @@ export function ToastContainer() {
   const visibleToasts = toasts.slice(-MAX_VISIBLE);
 
   return (
-    <div className="fixed bottom-20 left-0 right-0 z-[100] flex flex-col-reverse items-center gap-2 p-4 pointer-events-none">
+    <div role="region" aria-label="Notifications" className="fixed bottom-20 left-0 right-0 z-[100] flex flex-col-reverse items-center gap-2 p-4 pointer-events-none">
       {visibleToasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onDismiss={removeToast} />
       ))}

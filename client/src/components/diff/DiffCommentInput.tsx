@@ -56,7 +56,7 @@ export function DiffCommentInput({
       <button
         onClick={handleSubmit}
         disabled={!canSubmit}
-        className="w-10 h-10 flex items-center justify-center bg-accent text-white rounded-lg hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="w-11 h-11 flex items-center justify-center bg-accent text-white rounded-lg hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         aria-label="Send comment"
       >
         {isSubmitting ? (

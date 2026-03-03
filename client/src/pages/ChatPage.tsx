@@ -230,6 +230,7 @@ export function ChatPage() {
               }
             }}
             className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-danger/20 text-danger"
+            aria-label="Abort AI processing"
             title="Abort"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -242,6 +243,7 @@ export function ChatPage() {
         <button
           onClick={handleNewConversation}
           className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-bg-tertiary"
+          aria-label="New conversation"
           title="New conversation"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-text-secondary">
@@ -265,7 +267,7 @@ export function ChatPage() {
               Retry
             </button>
           )}
-          <button onClick={clearError} className="w-6 h-6 flex items-center justify-center text-danger hover:text-danger/80">
+          <button onClick={clearError} className="w-11 h-11 flex items-center justify-center text-danger hover:text-danger/80" aria-label="Dismiss error">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
               <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
             </svg>

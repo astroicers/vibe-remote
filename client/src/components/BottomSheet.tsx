@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -12,6 +13,9 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
   const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startY = useRef(0);
+
+  // Focus trap
+  useFocusTrap(sheetRef, isOpen);
 
   // Close on escape
   useEffect(() => {
@@ -59,11 +63,15 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
       <div
         className="fixed inset-0 z-40 bg-black/60 transition-opacity"
         onClick={onClose}
+        aria-hidden="true"
       />
 
       {/* Sheet */}
       <div
         ref={sheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title || 'Bottom sheet'}
         className="fixed inset-x-0 bottom-0 z-50 bg-bg-elevated rounded-t-2xl shadow-xl"
         style={{
           maxHeight: '85dvh',
