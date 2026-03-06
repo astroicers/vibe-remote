@@ -1,10 +1,22 @@
 services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "8443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - vibe-remote
+    restart: unless-stopped
+
   vibe-remote:
     build:
       context: .
       dockerfile: server/Dockerfile
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     volumes:
       # Mount workspace for Claude to access
       - ${WORKSPACE_HOST_PATH:-/home/ubuntu}:/workspace:rw
@@ -32,3 +44,5 @@ services:
 
 volumes:
   vibe-data:
+  caddy-data:
+  caddy-config:

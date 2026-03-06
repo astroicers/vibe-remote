@@ -57,9 +57,13 @@ CLAUDE.md.pre-asp
 .agent-lock.yaml
 docs/session-log.md
 
-# Misc
+# Certificates
 *.pem
 *.key
+*.crt
+*.csr
+
+# Misc
 CLAUDE.md.pre-upgrade
 .asp-tmp/
 *.out
