@@ -43,23 +43,26 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Tasks (Phase 2, but create table now)
+-- Tasks
 CREATE TABLE IF NOT EXISTS tasks (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   description TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'queued'
-    CHECK (status IN ('queued', 'running', 'awaiting_review', 'approved', 'committed', 'failed')),
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'queued', 'running', 'awaiting_review', 'approved', 'committed', 'completed', 'failed', 'cancelled')),
   priority TEXT NOT NULL DEFAULT 'normal'
     CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
   progress INTEGER,
   branch TEXT,
   depends_on TEXT, -- JSON array of task IDs
   context_files TEXT, -- JSON array of file paths
+  result TEXT,
+  error TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   started_at TEXT,
-  completed_at TEXT
+  completed_at TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- Diff reviews

@@ -63,6 +63,7 @@
 **Task 完成後：**
 - 不自動切回原分支（留在 task branch 以便 diff review）
 - Diff review 的 `GET /diff/current` 需顯示 task branch vs 原分支的差異
+- **Stash 行為**：branch 建立前的 `git stash` 在 task 成功或 AI 失敗後不會自動 pop（僅 branch 建立失敗時 pop）。此為有意設計——task 完成後用戶在 task branch 上 review，原 branch 的 stash 留待用戶手動 `git stash pop` 恢復
 
 **失敗情境：**
 

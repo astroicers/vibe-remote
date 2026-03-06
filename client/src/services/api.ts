@@ -50,6 +50,9 @@ async function request<T>(endpoint: string, options: FetchOptions = {}): Promise
   // Silent token renewal: if server sent a renewed token, save it
   const renewedToken = response.headers.get('X-Renewed-Token');
   if (renewedToken) {
+    if (import.meta.env.DEV) {
+      console.debug('[auth] Token renewed silently via X-Renewed-Token header');
+    }
     localStorage.setItem('auth_token', renewedToken);
     // Also update zustand store (dynamic import to avoid circular dep)
     import('../stores/auth').then(({ useAuthStore }) => {
@@ -62,6 +65,9 @@ async function request<T>(endpoint: string, options: FetchOptions = {}): Promise
     const data = await response.json().catch(() => ({ code: 'UNAUTHORIZED', error: 'Unauthorized' }));
     const code = data.code || 'UNAUTHORIZED';
     const message = AUTH_ERROR_MESSAGES[code] || AUTH_ERROR_MESSAGES.UNAUTHORIZED;
+    if (import.meta.env.DEV) {
+      console.debug(`[auth] 401 received: code=${code}, endpoint=${endpoint}`);
+    }
 
     // Only show toast + logout if not during initial checkAuth
     import('../stores/auth').then(({ useAuthStore }) => {

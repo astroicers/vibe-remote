@@ -34,6 +34,19 @@ services:
       - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
       - WORKSPACE_HOST_PATH=${WORKSPACE_HOST_PATH:-/home/ubuntu}
       - WORKSPACE_CONTAINER_PATH=/workspace
+      # AI Runner Limits (see .env.example for defaults)
+      - RUNNER_TIMEOUT_MS=${RUNNER_TIMEOUT_MS:-600000}
+      - MAX_CONCURRENT_RUNNERS=${MAX_CONCURRENT_RUNNERS:-3}
+      - MAX_TURNS_CHAT=${MAX_TURNS_CHAT:-20}
+      - MAX_TURNS_TASK=${MAX_TURNS_TASK:-30}
+      - TOOL_APPROVAL_ENABLED=${TOOL_APPROVAL_ENABLED:-false}
+      - TOOL_APPROVAL_TIMEOUT_MS=${TOOL_APPROVAL_TIMEOUT_MS:-120000}
+      - CONTEXT_HISTORY_COUNT=${CONTEXT_HISTORY_COUNT:-5}
+      # Rate Limiting
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
+      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-10}
+      # Security
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 30s

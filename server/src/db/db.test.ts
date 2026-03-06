@@ -129,7 +129,7 @@ describe('Migration detection via sqlite_master', () => {
     db.close();
   });
 
-  it('should detect old schema without pending status for migration check', () => {
+  it('should not need migration when schema already includes pending status', () => {
     const db = new Database(':memory:');
     db.exec(SCHEMA);
 
@@ -137,9 +137,9 @@ describe('Migration detection via sqlite_master', () => {
       .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'")
       .get() as { sql: string } | undefined;
 
-    // Original SCHEMA does NOT include 'pending' — migration detection would trigger
+    // Current SCHEMA already includes 'pending' — no migration needed
     const needsRecreate = tableInfo?.sql && !tableInfo.sql.includes("'pending'");
-    expect(needsRecreate).toBe(true);
+    expect(needsRecreate).toBe(false);
     db.close();
   });
 
