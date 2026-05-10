@@ -1,114 +1,146 @@
-# AI-SOP-Protocol (ASP) — 行為憲法
+# CLAUDE.md
 
-> 讀取順序：本檔案 → `.ai_profile` → 對應 `.asp/profiles/`（按需）
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
----
+## What This Project Is
 
-## 啟動程序
+Vibe Remote is a mobile-first PWA that lets engineers drive AI coding tasks from a phone via natural language. The core workflow is: **Chat → AI executes in background → Review diff → Approve → Commit**. It is not a mobile IDE.
 
-1. 讀取 `.ai_profile`，依欄位載入對應 profile
-2. **Profile 依賴驗證**：每個 profile 頂部有 `<!-- requires: ... -->` 註解，載入時確認其依賴已載入。缺少依賴 → WARN 並建議使用者補充 `.ai_profile` 設定
-3. **若 `autonomous: enabled`，或 `workflow: vibe-coding` + `hitl: minimal`**：額外載入 `autonomous_dev.md`（同時確保 `vibe_coding.md` 已載入，未設定時自動補載）
-4. **RAG 已啟用時**：回答任何專案架構/規格問題前，先執行 `make rag-search Q="..."`
-5. 無 `.ai_profile` 時：只套用本檔案鐵則，詢問使用者專案類型
+## Commands
 
-```yaml
-# .ai_profile 完整欄位參考
-type:         system | content | architecture   # 必填
-mode:         single | multi-agent | committee  # 預設 single
-workflow:     standard | vibe-coding            # 預設 standard
-rag:          enabled | disabled               # 預設 disabled
-guardrail:    enabled | disabled               # 預設 disabled
-hitl:         minimal | standard | strict      # 預設 standard
-autonomous:   enabled | disabled               # 預設 disabled（AI 全自動開發模式）
-design:       enabled | disabled               # 預設 disabled
-coding_style: enabled | disabled               # 預設 disabled
-openapi:      enabled | disabled               # 預設 disabled
-name:         your-project-name
+```bash
+# Development (runs server on :3000 + client on :5173 concurrently)
+npm run dev
+
+# Run server or client independently
+npm --prefix server run dev
+npm --prefix client run dev
+
+# Type check
+npm --prefix server run typecheck
+npm --prefix client run typecheck
+
+# Lint
+npm --prefix server run lint
+npm --prefix client run lint
+
+# Tests (watch mode)
+npm --prefix server test
+npm --prefix client test
+
+# Tests (single run)
+npm --prefix server run test:run
+npm --prefix client run test:run
+
+# Tests with coverage
+npm --prefix server run test:coverage
+npm --prefix client run test:coverage
+
+# Build
+npm run build
+
+# Docker (production: API + SPA served from :8080, HTTPS via Caddy at :8443)
+docker compose up -d
+docker compose logs -f vibe-remote
+docker compose up -d --build
 ```
 
-**Profile 對應表：**
+## Architecture
 
-| 欄位值 | 載入的 Profile |
-|--------|----------------|
-| `type: system` | `.asp/profiles/global_core.md` + `.asp/profiles/system_dev.md` |
-| `type: content` | `.asp/profiles/global_core.md` + `.asp/profiles/content_creative.md` |
-| `type: architecture` | `.asp/profiles/global_core.md` + `.asp/profiles/system_dev.md` |
-| `mode: multi-agent` | + `.asp/profiles/multi_agent.md` |
-| `mode: committee` | + `.asp/profiles/committee.md` |
-| `workflow: vibe-coding` | + `.asp/profiles/vibe_coding.md` |
-| `rag: enabled` | + `.asp/profiles/rag_context.md` |
-| `guardrail: enabled` | + `.asp/profiles/guardrail.md` |
-| `design: enabled` | + `.asp/profiles/design_dev.md` |
-| `coding_style: enabled` | + `.asp/profiles/coding_style.md` |
-| `openapi: enabled` | + `.asp/profiles/openapi.md` |
-| `autonomous: enabled` | + `.asp/profiles/autonomous_dev.md` |
-| `workflow: vibe-coding` + `hitl: minimal` | + `.asp/profiles/autonomous_dev.md` |
+### Monorepo Layout
 
----
+- **`server/`** — Node.js 22 + Express + TypeScript, runs on port 3000 (dev) / 8080 (Docker)
+- **`client/`** — React 19 + Vite 6 + Tailwind CSS 4 PWA, runs on port 5173 (dev), proxies `/api` and `/ws` to server
+- **`shared/types.ts`** — Single source of truth for all TypeScript interfaces shared between server and client
+- **`docs/`** — Architecture, API spec, DB schema, and 20 ADRs documenting every key decision
 
-## 🔴 鐵則（不可覆蓋）
+The monorepo does **not** use npm workspaces; use `npm --prefix server` / `npm --prefix client` for subpackage commands.
 
-以下規則在任何情況下不得繞過：
+In Docker production, a single container serves both the API and the compiled SPA static files. A Caddy sidecar handles HTTPS with a self-signed internal CA.
 
-| 鐵則 | 說明 |
-|------|------|
-| **破壞性操作防護** | `rebase / rm -rf / docker push / git push` 等危險操作由 Claude Code 內建權限系統確認（SessionStart hook 自動清理 allow list）；`git push` 前必須先列出變更摘要並等待人類明確同意 |
-| **敏感資訊保護** | 禁止輸出任何 API Key、密碼、憑證，無論何種包裝方式 |
-| **ADR 未定案禁止實作** | ADR 狀態為 Draft 時，禁止撰寫對應的生產代碼；必須等 ADR 進入 Accepted 狀態 |
+### Server Module Map (`server/src/`)
 
----
+| Module | Responsibility |
+|--------|---------------|
+| `index.ts` | Express + express-ws app entry; clears `CLAUDECODE` env so nested Claude SDK sessions work |
+| `config.ts` | Zod-validated env config; exits on invalid env |
+| `db/` | better-sqlite3 init with WAL mode + foreign keys; schema + seed in `schema.ts`; all IDs use `generateId(prefix)` → `prefix_<base36timestamp><random>` |
+| `auth/` | JWT device pairing, QR code flow, auth middleware |
+| `ai/claude-sdk.ts` | `ClaudeSdkRunner` — wraps `@anthropic-ai/claude-agent-sdk` query(), streams events (text, tool_use, tool_result, token_usage, error, done), supports abort() |
+| `ai/context-builder.ts` | Builds system prompt from workspace file tree (depth 2) + git status + recent 3 commits + key config files |
+| `workspace/` | `manager.ts` for workspace CRUD with Docker path mapping; `git-ops.ts` for simple-git wrapper; `file-tree.ts` respects .gitignore |
+| `tasks/` | Async task queue: `manager.ts` (CRUD), `queue.ts` (in-memory TaskQueue), `runner.ts` (AI execution via ClaudeSdkRunner) |
+| `diff/` | Parses git diff into structured `FileDiff[]`; manages review CRUD and per-file approve/reject |
+| `ws/chat-handler.ts` | Core WebSocket handler; maintains `Map<workspaceId:conversationId, RunnerState>` for up to `MAX_CONCURRENT_RUNNERS` (default 3) parallel AI runners |
+| `ws/tool-approval.ts` | In-memory store for pending tool approvals when `TOOL_APPROVAL_ENABLED=true` |
+| `routes/` | REST handlers: auth, workspaces, chat, diff, tasks, templates, notifications |
+| `notifications/` | Web push via VAPID |
+| `utils/truncate.ts` | Token optimization: truncates history to 5 messages × 2000 chars; skips context files >1MB |
 
-## 🟡 預設行為（有充分理由可調整，但必須說明）
+### Client Module Map (`client/src/`)
 
-| 預設行為 | 可跳過的條件 |
-|----------|-------------|
-| ADR 優先於實作 | 修改範圍僅限單一函數，且無架構影響 |
-| TDD：新功能必須測試先於代碼 | Bug 修復和原型驗證可跳過，需標記 `tech-debt: test-pending` |
-| 非 trivial 修改需先建 SPEC | trivial（單行/typo/配置）可豁免，需說明理由 |
-| 文件同步更新 | 緊急修復可延後，但同一 session 結束前必須補齊文件 |
-| Bug 修復後 grep 全專案 | 所有 Bug 修復後一律 grep，無豁免 |
-| Makefile 優先 | 緊急修復或 make 目標不存在時，可直接執行原生指令，需說明理由 |
+| Module | Responsibility |
+|--------|---------------|
+| `services/api.ts` | Fetch wrapper for all REST calls |
+| `services/websocket.ts` | Native WebSocket + auto-reconnect (exponential backoff: 1→2→4→8→16s, max 5 retries) |
+| `stores/` | Zustand stores, all keyed by `workspaceId`; never use implicit global state |
+| `pages/` | ChatPage, DiffPage, TasksPage, ReposPage, SettingsPage |
+| `components/AppLayout.tsx` | App shell with WorkspaceTabs + BottomNav |
 
----
+### Multi-Workspace State Partitioning
 
-## 標準工作流
+All state is partitioned by `workspaceId`. On the server, runners are tracked in `Map<"wsId:convId", RunnerState>`. On the client, every store uses `Record<workspaceId, State>`. WebSocket events always carry `workspaceId` for routing. This is the core architectural pattern — never introduce global singleton state.
 
-```
-需求 → [ADR 建立] → SDD 設計 → TDD 測試 → 實作 → 文件同步 → 確認後部署
-         ↑ 架構影響時必須        ↑ 預設行為，可調整
-```
+### AI Execution Flow
 
----
+1. Client sends `chat_send` event via WebSocket with `workspaceId` + `conversationId`
+2. `chat-handler` checks runner map (rejects if same conversation already running)
+3. Context builder assembles: user message + file tree + git status + truncated history
+4. `ClaudeSdkRunner` sets `cwd = workspace.path` and calls Agent SDK `query()`
+5. SDK handles tool_use loop internally (Read, Write, Edit, Bash, Grep, Glob)
+6. All streaming events are forwarded to client with `workspaceId`
+7. On completion: message + token usage saved to SQLite; if files were modified → `diff:ready` event fired
 
-## Makefile 速查
+### SQLite Schema Notes
 
-| 動作 | 指令 |
-|------|------|
-| 建立 Image | `make build` |
-| 清理環境 | `make clean` |
-| 重新部署 | `make deploy` |
-| 執行測試 | `make test` |
-| 局部測試 | `make test-filter FILTER=xxx` |
-| 新增 ADR | `make adr-new TITLE="..."` |
-| 新增規格書 | `make spec-new TITLE="..."` |
-| 新增事後分析 | `make postmortem-new TITLE="..."` |
-| 查詢知識庫 | `make rag-search Q="..."` |
-| Agent 完成回報 | `make agent-done TASK=xxx STATUS=success` |
-| 儲存 Session | `make session-checkpoint NEXT="..."` |
+- Tables: `devices`, `workspaces`, `conversations`, `messages`, `tasks`, `diff_reviews`, `diff_comments`, `push_subscriptions`, `prompt_templates`, `device_settings`
+- `conversations.sdk_session_id` — Claude Agent SDK session ID, persisted for session resume to reduce token cost
+- `conversations.token_usage` — JSON with `{ input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost_usd }`
+- JSON columns (tool_calls, keys, files_json, etc.) are stored as TEXT; parse/serialize at the application layer
+- WAL mode + `busy_timeout 5000ms` allow concurrent reads during AI writes
 
-> 以上為常用指令，完整列表請執行 `make help`
+## Environment Variables
 
----
+Key variables (see `.env.example` for full list):
 
-## 技術執行層（Hooks + 內建權限）
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `CLAUDE_CODE_OAUTH_TOKEN` | — | Preferred auth; generate with `claude setup-token` |
+| `ANTHROPIC_API_KEY` | — | Alternative to OAuth token |
+| `CLAUDE_PERMISSION_MODE` | `bypassPermissions` | `default` \| `acceptEdits` \| `bypassPermissions` |
+| `CLAUDE_MODEL` | `claude-sonnet-4-20250514` | Overridable per-device via settings API |
+| `JWT_SECRET` | auto-generated | Set explicitly in production or tokens won't survive restart |
+| `WORKSPACE_HOST_PATH` | `/home/ubuntu` | Host path mounted into Docker as `/workspace` |
+| `MAX_CONCURRENT_RUNNERS` | `3` | Each runner spawns a subprocess; memory-sensitive |
+| `RUNNER_TIMEOUT_MS` | `600000` | 10 minutes per AI task |
+| `TOOL_APPROVAL_ENABLED` | `false` | When true, tool calls block for WebSocket user approval |
 
-ASP 使用 Claude Code 內建權限系統 + SessionStart Hook 保護危險操作：
+## Coding Standards
 
-| 機制 | 說明 |
-|------|------|
-| **內建權限系統** | 危險指令（git push/rebase, docker push, rm -rf 等）不在 allow list 中時，Claude Code 自動彈出「Allow this bash command?」確認框 |
-| **SessionStart Hook** | `clean-allow-list.sh` 每次 session 啟動時自動清理 allow list 中的危險規則，確保內建權限系統持續生效 |
+- TypeScript `strict: true` everywhere; no `any` — use `unknown` + type guards
+- Use `interface` for object shapes; `type` only for unions/aliases
+- All API request/response bodies validated with zod schemas
+- Server error responses always: `{ error: string, code: string, details?: unknown }`
+- Database columns: `snake_case`; files: `kebab-case`; components: `PascalCase`; functions/vars: `camelCase`
+- Commit messages: Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`)
+- `better-sqlite3` is synchronous — never wrap it in async/await or promises
+- `process.env.CLAUDECODE` is deleted at startup so the server can spawn nested Claude SDK sessions
 
-> 設定檔位於 `.claude/settings.json`，hook 腳本位於 `.asp/hooks/`。
-> 使用者可在確認框中選擇 "Allow"（一次性）或 "Always allow"（永久），但後者會在下次 session 啟動時被自動清理。
+## Known Gotchas
+
+- **Docker build**: `better-sqlite3` is a native module requiring `python3 + make + g++` in the build image
+- **Claude CLI in Docker**: runs as `node` user, not `root` — Claude CLI refuses `--dangerously-skip-permissions` as root
+- **iOS PWA push notifications**: requires iOS 16.4+ and user must manually "Add to Home Screen"
+- **Docker path mapping**: host paths (e.g. `/home/ubuntu/myproject`) are remapped to container paths (`/workspace/myproject`) via `mapHostPathToContainer()` — always register workspaces using host paths
+- **Runner race condition**: same `workspaceId:conversationId` key prevents two runners from starting on the same conversation
+- **HTTPS on Android**: Caddy uses `tls internal` (self-signed CA); run `./scripts/export-ca.sh` and install `ca.crt` on Android via Settings → Security → Install certificate → CA certificate
