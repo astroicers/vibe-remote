@@ -2,6 +2,16 @@
 
 **Mobile-first agentic coding gateway** — 在通勤時用手機 vibe coding。
 
+> ## ⚠️ 專案已退役（Sunset / Archived，2026-06-10）
+>
+> 本專案的核心迴圈「手機 → AI 背景執行 → review diff → approve → commit」**已被 Anthropic 第一方產品 [Claude Code 網頁版](https://claude.ai/code) 取代**（連 GitHub repo、雲端 VM 執行、官方 iOS app 監看、Routines 排程觸發、零維運）。
+>
+> 對於「程式碼放在 GitHub」的個人使用情境，官方方案已能完整覆蓋，因此本專案停止維護、轉為唯讀封存。
+>
+> - **改用**：[claude.ai/code](https://claude.ai/code) + Claude iOS app + Routines
+> - **退役決策與分析**：見 [ADR-021](docs/adr/ADR-021-sunset-superseded-by-claude-code-web.md)
+> - 程式碼與 20+ 篇架構 ADR 保留作為參考與回顧素材；如需對「本機/非 Git/內網」環境動作，仍可隨選 `docker compose up` 啟動。
+
 ## 這是什麼？
 
 Vibe Remote 讓你在手機上透過自然語言（語音 + 文字）驅動 AI 完成 coding 任務。它不是把 IDE 搬到手機上，而是專門為「對話 → review diff → approve → commit」的工作流程設計的 mobile-first 介面。
